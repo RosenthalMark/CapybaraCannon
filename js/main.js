@@ -173,7 +173,7 @@ class Game {
         e.preventDefault();
         if (!this.keys.space) {
           this.keys.space = true;
-          this.handleActionPress();
+          this.onActionDown();
         }
       }
     });
@@ -188,19 +188,19 @@ class Game {
       if (e.code === 'Space') {
         e.preventDefault();
         this.keys.space = false;
-        this.handleActionRelease();
+        this.onActionUp();
       }
     });
 
     // Launch Button (Mouse & Touch)
     const onActionStart = (e) => {
       e.preventDefault();
-      this.handleActionPress();
+      this.onActionDown();
     };
 
     const onActionEnd = (e) => {
       e.preventDefault();
-      this.handleActionRelease();
+      this.onActionUp();
     };
 
     this.ui.launchBtn.addEventListener('mousedown', onActionStart);
@@ -208,10 +208,11 @@ class Game {
 
     this.ui.launchBtn.addEventListener('touchstart', onActionStart, { passive: false });
     window.addEventListener('touchend', onActionEnd, { passive: false });
+    window.addEventListener('touchcancel', onActionEnd, { passive: false });
 
     // Mid-air boost trigger button
     this.ui.airBoostTrigger.addEventListener('click', () => {
-      this.triggerZenBoost();
+      this.onActionDown();
     });
 
     // Aiming by Mouse Drag / Move
@@ -221,9 +222,17 @@ class Game {
         isAimDragging = true;
         this.aimWithScreenCoords(e.clientX, e.clientY);
       } else if (this.state === 'FLIGHT') {
-        this.triggerZenBoost();
+        this.onActionDown();
       }
     });
+
+    // Canvas Touch in Flight
+    this.canvas.addEventListener('touchstart', (e) => {
+      if (this.state === 'FLIGHT') {
+        e.preventDefault();
+        this.onActionDown();
+      }
+    }, { passive: false });
 
     this.canvas.addEventListener('mousemove', (e) => {
       if (isAimDragging && (this.state === 'AIMING' || this.state === 'CHARGING')) {
@@ -333,7 +342,7 @@ class Game {
     }
   }
 
-  handleActionPress() {
+  onActionDown() {
     if (this.state === 'TITLE') {
       if (!this.audio.titleMusicPlaying) {
         this.audio.playTitleMusic();
@@ -351,10 +360,19 @@ class Game {
     }
   }
 
-  handleActionRelease() {
+  onActionUp() {
     if (this.state === 'CHARGING') {
       this.fireCannon();
     }
+  }
+
+  // Backwards-compatibility aliases
+  handleActionPress() {
+    this.onActionDown();
+  }
+
+  handleActionRelease() {
+    this.onActionUp();
   }
 
   calculateLaunchSpeed(power01) {
