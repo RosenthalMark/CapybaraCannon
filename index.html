@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Capybara Cannon 🦫💥</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Luckiest+Guy&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=9">
+</head>
+<body>
+  <div id="game-container">
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 100% Visual Fidelity Title Screen Overlay -->
+    <div id="titleScreen" class="title-screen">
+      <div class="title-artwork-container">
+        <img src="assets/art/title-screen-1080p.png" onerror="this.src='assets/CCanon.png'" alt="Capybara Cannon Title Screen" class="title-artwork-img" id="titleArtworkImg">
+        <!-- Interactive transparent hit-boxes mapped precisely to CCanon artwork buttons -->
+        <button id="titlePlayBtn" class="title-hitbox btn-play" aria-label="Play Game" title="PLAY"></button>
+        <button id="titleShopBtn" class="title-hitbox btn-shop" aria-label="Shop" title="SHOP"></button>
+        <button id="titleAccountBtn" class="title-hitbox btn-account" aria-label="Account" title="ACCOUNT"></button>
+        <button id="titleCustomizeBtn" class="title-hitbox btn-customize" aria-label="Customize" title="CUSTOMIZE"></button>
+        <button id="titleSelectionBtn" class="title-hitbox btn-selection" aria-label="Capybara Selection" title="CAPYBARA SELECTION"></button>
+      </div>
+    </div>
+
+    <!-- Top Floating HUD -->
+    <div id="hud">
+      <div class="hud-card distance-card">
+        <span class="hud-label">DISTANCE</span>
+        <span class="hud-value" id="distanceVal">0.0 <small>m</small></span>
+        <span class="hud-best" id="bestDistanceVal">BEST: 0.0 m</span>
+      </div>
+
+      <div class="hud-card flight-stats">
+        <div class="stat-item">
+          <span class="stat-icon">📈</span>
+          <span class="stat-text" id="altitudeVal">0 m</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">⚡</span>
+          <span class="stat-text" id="speedVal">0 km/h</span>
+        </div>
+      </div>
+
+      <div class="hud-card boosts-card" id="boostsCard">
+        <span class="hud-label">ZEN BOOST</span>
+        <div class="boost-pips" id="boostPips">
+          <span class="pip active" title="Zen Boost">🍊</span>
+        </div>
+        <span class="boost-hint">[SPACE / TAP]</span>
+      </div>
+
+      <div class="hud-actions">
+        <button id="audioBtn" class="hud-btn" title="Toggle Sound">🔊</button>
+        <button id="helpBtn" class="hud-btn" title="How to Play">❓</button>
+      </div>
+    </div>
+
+    <!-- Floating Messages / Alerts Overlay -->
+    <div id="toast-container"></div>
+
+    <!-- Aiming & Launch Controls Overlay (Visible in AIMING / CHARGING state) -->
+    <div id="launch-controls" class="launch-controls">
+      <div class="aim-hint">
+        <span>Use <b>↑ / ↓</b> or <b>Drag Mouse</b> to Aim</span>
+      </div>
+      <div class="power-meter-container">
+        <div class="power-meter-label">
+          <span>LAUNCH POWER</span>
+          <span id="powerPercent">0%</span>
+        </div>
+        <div class="power-meter-track">
+          <div class="power-meter-bar" id="powerBar"></div>
+          <div class="power-meter-sweetspot"></div>
+        </div>
+      </div>
+      <button id="launchBtn" class="arcade-btn launch-btn">HOLD TO CHARGE & FIRE</button>
+    </div>
+
+    <!-- Mid-Air Boost Prompt (Mobile friendly touch trigger area) -->
+    <div id="air-boost-trigger" class="air-boost-trigger hidden">
+      <span>TAP FOR ZEN BOOST!</span>
+    </div>
+
+    <!-- Stylized Game Over / Flight Summary & Leaderboard Modal -->
+    <div id="resultsModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">FLIGHT COMPLETE!</h2>
+          <div class="capy-badge">🦫💥</div>
+        </div>
+        <div class="modal-body">
+          <div class="score-highlight">
+            <span class="score-title">YOUR DISTANCE</span>
+            <span class="score-number" id="finalDistance">0.0 m</span>
+            <div class="alltime-best-row">
+              <span class="alltime-label">ALL-TIME BEST:</span>
+              <span class="alltime-val" id="finalAllTimeBest">0.0 m</span>
+            </div>
+            <span class="new-record-badge hidden" id="newRecordBadge">🏆 NEW ALL-TIME RECORD!</span>
+          </div>
+
+          <!-- High Score Name Entry (Shown if qualified for Top 3) -->
+          <div id="nameEntryCard" class="name-entry-card hidden">
+            <div class="high-score-banner">🎉 NEW TOP 3 HIGH SCORE!</div>
+            <div class="name-input-group">
+              <input type="text" id="playerNameInput" maxlength="12" placeholder="ENTER YOUR NAME" autocomplete="off" spellcheck="false">
+              <button id="saveScoreBtn" class="arcade-btn save-btn">SAVE</button>
+            </div>
+          </div>
+
+          <!-- Top 3 Leaderboard -->
+          <div class="leaderboard-section">
+            <div class="leaderboard-title">🏆 TOP 3 CAPYBARA CANNON LEADERBOARD</div>
+            <div class="leaderboard-list" id="leaderboardList">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Flight Quick Stats -->
+          <div class="stats-grid">
+            <div class="stat-box">
+              <span class="box-label">MAX ALTITUDE</span>
+              <span class="box-val" id="finalAltitude">0 m</span>
+            </div>
+            <div class="stat-box">
+              <span class="box-label">TOP SPEED</span>
+              <span class="box-val" id="finalSpeed">0 km/h</span>
+            </div>
+            <div class="stat-box">
+              <span class="box-label">TNT BLASTS</span>
+              <span class="box-val" id="statTnt">0</span>
+            </div>
+            <div class="stat-box">
+              <span class="box-label">BOUNCES</span>
+              <span class="box-val" id="statBounces">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer results-footer">
+          <button id="replayBtn" class="arcade-btn relaunch-btn">🚀 RELAUNCH</button>
+          <button id="titleReturnBtn" class="arcade-btn sub-btn">🏠 TITLE SCREEN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop Modal Scaffold -->
+    <div id="shopModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">🛒 CAPYBARA SHOP</h2>
+          <div class="capy-badge">🛍️</div>
+        </div>
+        <div class="modal-body scaffold-body">
+          <div class="scaffold-banner">✨ GRAND OPENING SOON ✨</div>
+          <p class="scaffold-desc">Stock up on Citrus Seeds! Soon you'll be able to purchase special abilities, fresh outfits, and extra turns right here.</p>
+          <div class="scaffold-grid">
+            <div class="scaffold-pill">⚡ Special Powers</div>
+            <div class="scaffold-pill">👒 Outfits</div>
+            <div class="scaffold-pill">🔄 Extra Turns</div>
+            <div class="scaffold-pill">🦫 New Capybaras</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="closeShopBtn" class="arcade-btn relaunch-btn">🔙 BACK TO TITLE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Account Modal Scaffold -->
+    <div id="accountModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">📋 PLAYER ACCOUNT</h2>
+          <div class="capy-badge">🦫</div>
+        </div>
+        <div class="modal-body scaffold-body">
+          <div class="scaffold-banner">✨ LOCAL PROFILE ACTIVE ✨</div>
+          <div class="account-card">
+            <div class="account-row"><span class="account-label">PILOT STATUS</span><span class="account-val">CAPYBARA CADET</span></div>
+            <div class="account-row"><span class="account-label">ACTIVE CAPYBARA</span><span class="account-val" id="profileActiveCapy">CLASSIC ZEN</span></div>
+            <div class="account-row"><span class="account-label">ALL-TIME BEST</span><span class="account-val" id="profileBestDist">0.0 m</span></div>
+            <div class="account-row"><span class="account-label">CURRENCY</span><span class="account-val">0 🍊</span></div>
+            <div class="account-row"><span class="account-label">UNLOCKED CAPYS</span><span class="account-val">1 / 12</span></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="closeAccountBtn" class="arcade-btn relaunch-btn">🔙 BACK TO TITLE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customize Modal Scaffold -->
+    <div id="customizeModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">👒 CUSTOMIZE</h2>
+          <div class="capy-badge">🕶️</div>
+        </div>
+        <div class="modal-body scaffold-body">
+          <div class="scaffold-banner">✨ WARDROBE COMING SOON ✨</div>
+          <p class="scaffold-desc">Mix and match hilarious hats, glasses, shirts, skirts, and secret outfit combinations to unlock huge bonuses!</p>
+          <div class="scaffold-grid">
+            <div class="scaffold-pill">🎩 Hats & Hair</div>
+            <div class="scaffold-pill">🕶️ Glasses</div>
+            <div class="scaffold-pill">👕 Shirts & Pants</div>
+            <div class="scaffold-pill">💍 Jewelry Slot</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="closeCustomizeBtn" class="arcade-btn relaunch-btn">🔙 BACK TO TITLE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selection Modal Scaffold -->
+    <div id="selectionModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">🦫 CAPYBARA SELECTION</h2>
+          <div class="capy-badge">✨</div>
+        </div>
+        <div class="modal-body scaffold-body">
+          <div class="scaffold-banner">✨ ROSTER PREVIEW ✨</div>
+          <div class="selection-roster-preview">
+            <div class="roster-card active">
+              <span class="roster-icon">🦫</span>
+              <span class="roster-name">Classic Zen</span>
+              <span class="roster-trait">Balanced flight & calm vibes</span>
+              <span class="roster-tag">SELECTED</span>
+            </div>
+            <div class="roster-card locked">
+              <span class="roster-icon">🔒</span>
+              <span class="roster-name">Turbo Orange</span>
+              <span class="roster-trait">Unlocks via Shop / Milestones</span>
+            </div>
+            <div class="roster-card locked">
+              <span class="roster-icon">🔒</span>
+              <span class="roster-name">Bounce Master</span>
+              <span class="roster-trait">Unlocks via Shop / Milestones</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="closeSelectionBtn" class="arcade-btn relaunch-btn">🔙 BACK TO TITLE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- How To Play Modal -->
+    <div id="helpModal" class="modal-backdrop hidden">
+      <div class="modal-card help-card">
+        <h2 class="modal-title">HOW TO PLAY</h2>
+        <div class="help-content">
+          <p>Launch our chill capybara as far as possible across the wild wetlands!</p>
+          <div class="help-item">
+            <span class="help-icon">🎯</span>
+            <div><b>Aim & Power:</b> Aim cannon with <b>↑/↓</b> arrows or drag. Press & hold <b>SPACE</b> or <b>Launch Button</b> to meter power, release to fire!</div>
+          </div>
+          <div class="help-item">
+            <span class="help-icon">🍊</span>
+            <div><b>Zen Boosts:</b> Press <b>SPACE</b> or tap the screen up to 3 times mid-flight for emergency upward speed!</div>
+          </div>
+          <div class="help-item">
+            <span class="help-icon">💥</span>
+            <div><b>TNT Barrels:</b> Mega explosive blast propelling you forward & high!</div>
+          </div>
+          <div class="help-item">
+            <span class="help-icon">🍄</span>
+            <div><b>Trampolines:</b> Bouncy launch pads!</div>
+          </div>
+          <div class="help-item">
+            <span class="help-icon">♨️</span>
+            <div><b>Hot Springs:</b> Soothing mud & hot water slides that boost speed!</div>
+          </div>
+          <div class="help-item">
+            <span class="help-icon">🌵</span>
+            <div><b>Cacti & Mud:</b> Sticky hazards that slow you down to a crawl!</div>
+          </div>
+        </div>
+        <button id="closeHelpBtn" class="arcade-btn small-btn">GOT IT!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="js/main.js?v=8"></script>
+</body>
+</html>
