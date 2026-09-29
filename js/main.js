@@ -368,8 +368,10 @@ class Game {
 
     if (dx > 5) {
       let angle = Math.atan2(dy, dx);
-      // Clamp angle between 5 deg and 85 deg
-      angle = Math.max(5 * Math.PI / 180, Math.min(85 * Math.PI / 180, angle));
+      // Clamp angle between configured world limits (10 deg to 60 deg)
+      const minAngle = this.world.minCannonAngle ?? (10 * Math.PI / 180);
+      const maxAngle = this.world.maxCannonAngle ?? (60 * Math.PI / 180);
+      angle = Math.max(minAngle, Math.min(maxAngle, angle));
       this.world.cannonAngle = angle;
     }
   }
@@ -516,11 +518,13 @@ class Game {
     // 1. Aiming angle keyboard controls
     if (this.state === 'AIMING' || this.state === 'CHARGING') {
       const angleSpeed = 1.0 * dt;
+      const minAngle = this.world.minCannonAngle ?? (10 * Math.PI / 180);
+      const maxAngle = this.world.maxCannonAngle ?? (60 * Math.PI / 180);
       if (this.keys.up) {
-        this.world.cannonAngle = Math.min(85 * Math.PI / 180, this.world.cannonAngle + angleSpeed);
+        this.world.cannonAngle = Math.min(maxAngle, this.world.cannonAngle + angleSpeed);
       }
       if (this.keys.down) {
-        this.world.cannonAngle = Math.max(5 * Math.PI / 180, this.world.cannonAngle - angleSpeed);
+        this.world.cannonAngle = Math.max(minAngle, this.world.cannonAngle - angleSpeed);
       }
     }
 

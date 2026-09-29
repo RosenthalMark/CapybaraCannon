@@ -13,6 +13,8 @@ export class PhysicsEngine {
     this.groundFriction = 0.88; // horizontal slide damping on contact
     this.rollingFriction = 0.965; // continuous friction when rolling
     this.jetpackThrust = 1600; // upward thrust acceleration in px/sec^2
+    this.jetpackMaxAltitude = 520; // maximum ground-relative flight envelope in px
+    this.jetpackSoftBuffer = 120; // soft attenuation zone in px (400px - 520px)
   }
 
   update(capy, dt, onBounce) {
@@ -44,8 +46,28 @@ export class PhysicsEngine {
 
     // 2. Gravity and Jetpack Thrust
     if (capy.isThrusting) {
+      // Calculate ground-relative altitude
+      const groundY = this.world.getGroundY(capy.x);
+      const altitude = groundY - capy.y;
+      const softAlt = this.jetpackMaxAltitude - this.jetpackSoftBuffer;
+
+      let effectiveThrust = this.jetpackThrust;
+      if (altitude > softAlt) {
+        // Attenuate thrust progressively in the buffer zone [softAlt, jetpackMaxAltitude]
+        const t = Math.max(0, Math.min(1.0, (altitude - softAlt) / this.jetpackSoftBuffer));
+        // Scale thrust from full jetpackThrust (1600) down to 400 px/s^2 at the top
+        // (below gravity so upward acceleration naturally softens and reverses)
+        const minThrustAtTop = 400;
+        effectiveThrust = this.jetpackThrust - t * (this.jetpackThrust - minThrustAtTop);
+
+        // Additional gentle atmospheric resistance on upward velocity
+        if (capy.vy < 0) {
+          capy.vy += t * 300 * dt;
+        }
+      }
+
       // Upward thrust opposes downward gravity
-      capy.vy += (this.gravity - this.jetpackThrust) * dt;
+      capy.vy += (this.gravity - effectiveThrust) * dt;
     } else {
       capy.vy += this.gravity * dt;
     }
@@ -53,6 +75,18 @@ export class PhysicsEngine {
     // 3. Integrate position
     capy.x += capy.vx * dt;
     capy.y += capy.vy * dt;
+
+    // Upper flight envelope absolute safety clamp (when equipped with jetpack)
+    if (capy.hasJetpack) {
+      const currentGroundY = this.world.getGroundY(capy.x);
+      const currentAlt = currentGroundY - capy.y;
+      if (currentAlt > this.jetpackMaxAltitude) {
+        capy.y = currentGroundY - this.jetpackMaxAltitude;
+        if (capy.vy < 0) {
+          capy.vy = 0;
+        }
+      }
+    }
 
     // 4. Ground Collision
     const groundY = this.world.getGroundY(capy.x);

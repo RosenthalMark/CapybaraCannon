@@ -14,6 +14,8 @@ export class World {
     // Cannon properties
     this.cannonX = 70;
     this.cannonY = baseGroundY;
+    this.minCannonAngle = 10 * (Math.PI / 180); // minimum allowed elevation (10 deg)
+    this.maxCannonAngle = 60 * (Math.PI / 180); // maximum allowed elevation (60 deg)
     this.cannonAngle = 45 * (Math.PI / 180); // in radians
     this.cannonLength = 55;
     this.cannonWidth = 32;
