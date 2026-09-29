@@ -20,6 +20,7 @@ export class UIManager {
     this.resultsModal = document.getElementById('resultsModal');
     this.helpModal = document.getElementById('helpModal');
     this.audioBtn = document.getElementById('audioBtn');
+    this.jetpackDevBtn = document.getElementById('jetpackDevBtn');
     this.helpBtn = document.getElementById('helpBtn');
     this.closeHelpBtn = document.getElementById('closeHelpBtn');
     this.replayBtn = document.getElementById('replayBtn');
@@ -196,6 +197,36 @@ export class UIManager {
       this.airBoostTrigger.classList.remove('hidden');
     } else {
       this.airBoostTrigger.classList.add('hidden');
+    }
+  }
+
+  setJetpackActive(active) {
+    if (active) {
+      if (this.boostsCard) {
+        const label = this.boostsCard.querySelector('.hud-label');
+        if (label) label.textContent = 'JETPACK';
+        if (this.boostPips) {
+          this.boostPips.innerHTML = '<span class="pip active" title="Jetpack Mode">🎒</span>';
+        }
+        const hint = this.boostsCard.querySelector('.boost-hint');
+        if (hint) hint.textContent = '[HOLD SPACE / TOUCH]';
+      }
+      if (this.jetpackDevBtn) {
+        this.jetpackDevBtn.classList.add('active');
+      }
+    } else {
+      if (this.boostsCard) {
+        const label = this.boostsCard.querySelector('.hud-label');
+        if (label) label.textContent = 'ZEN BOOST';
+        if (this.boostPips) {
+          this.boostPips.innerHTML = '<span class="pip active" title="Zen Boost">🍊</span>';
+        }
+        const hint = this.boostsCard.querySelector('.boost-hint');
+        if (hint) hint.textContent = '[SPACE / TAP]';
+      }
+      if (this.jetpackDevBtn) {
+        this.jetpackDevBtn.classList.remove('active');
+      }
     }
   }
 

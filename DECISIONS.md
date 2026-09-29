@@ -172,3 +172,40 @@ Establish a fundamental architectural separation between the **CUSTOMIZE** and *
 - **Cons**:
   - Requires dedicated custom background illustration and sprite assets from Mark prior to full Shop/Customize implementation.
 
+---
+
+## ADR-005: Jetpack Movement Architecture & State Separation
+
+### Status: Accepted & Implemented (Stage 2)
+
+### Context
+The long-term vision of Capybara Cannon includes hybrid gameplay alternating between ballistic cannon launch, airborne jetpack flight, and ground runner phases. Introducing jetpack movement without careful state boundary isolation risks corrupting the existing working cannon launch physics, air drag, and Zen Boost systems.
+
+### Decision
+1. **Explicit FSM State `JETPACK_FLIGHT`**:
+   - Differentiate ballistic flight (`FLIGHT`) from player-controlled jetpack flight (`JETPACK_FLIGHT`).
+   - Normal launches remain in `FLIGHT` unless jetpack flight is explicitly engaged.
+2. **Unified Input Abstraction Routing**:
+   - In `JETPACK_FLIGHT`, `onActionDown()` sets `capybara.isThrusting = true`.
+   - `onActionUp()` sets `capybara.isThrusting = false`.
+   - Desktop Spacebar and mobile touch feed the exact same action pipeline.
+3. **Deterministic Physics Contract**:
+   - Jetpack applies upward vertical acceleration ($1,600\text{ px/s}^2$) against downward gravity ($680\text{ px/s}^2$).
+   - Horizontal velocity ($v_x$) and aerodynamic drag remain completely intact; no teleports, velocity resets, or snapping.
+   - When thrust is released, gravity takes over naturally.
+   - Ground collision, bouncing, sliding, and stop detection execute identically via shared physics substeps.
+4. **Decoupled Prototype Triggers**:
+   - Jetpack state can be entered deterministically via `KeyJ` on desktop, the `#jetpackDevBtn` HUD button on mobile touch, and `?jetpack=1` URL query parameter.
+   - Production launch flow is not polluted by hardcoding automatic jetpacks for all launches.
+5. **Strict Scope Isolation**:
+   - Fuel systems (Stage 3), runner mechanics (Stage 4/5), and power-up drop engines remain explicitly excluded.
+
+### Consequences
+- **Pros**:
+  - Full backward compatibility: all existing ballistic launch and title tests pass 100%.
+  - Zero disruption to camera tracking, obstacle collisions, or distance scoring.
+  - Ready for seamless plug-in of fuel consumption in Stage 3 and world pickups in future stages.
+- **Cons**:
+  - Requires maintaining temporary developer trigger entry points until pickup items are placed in the world.
+
+

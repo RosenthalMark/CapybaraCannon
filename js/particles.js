@@ -261,4 +261,34 @@ export class ParticleSystem {
       }));
     }
   }
+
+  emitJetpackThrust(x, y, angle = 0) {
+    // Small flame spark and smoke puff drifting downward/backward from thruster
+    const pAngle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.5;
+    const speed = Math.random() * 180 + 80;
+    this.particles.push(new Particle(x, y, {
+      vx: Math.cos(pAngle) * speed - 60,
+      vy: Math.sin(pAngle) * speed + 40,
+      radius: Math.random() * 3.5 + 2,
+      color: ['#f97316', '#fbbf24', '#ef4444', '#fef08a'][Math.floor(Math.random() * 4)],
+      alpha: 0.9,
+      decay: 2.8,
+      gravity: 80,
+      shape: 'circle'
+    }));
+
+    if (Math.random() < 0.35) {
+      this.particles.push(new Particle(x, y, {
+        vx: -Math.random() * 80 - 20,
+        vy: Math.random() * 60 + 20,
+        radius: Math.random() * 5 + 3,
+        maxRadius: Math.random() * 16 + 10,
+        color: '#94a3b8',
+        alpha: 0.5,
+        decay: 1.5,
+        gravity: -20,
+        shape: 'smoke'
+      }));
+    }
+  }
 }

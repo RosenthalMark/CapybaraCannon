@@ -12,6 +12,7 @@ export class PhysicsEngine {
     this.groundRestitution = 0.52; // bounciness
     this.groundFriction = 0.88; // horizontal slide damping on contact
     this.rollingFriction = 0.965; // continuous friction when rolling
+    this.jetpackThrust = 1600; // upward thrust acceleration in px/sec^2
   }
 
   update(capy, dt, onBounce) {
@@ -41,8 +42,13 @@ export class PhysicsEngine {
       capy.vy -= dragVy * dt;
     }
 
-    // 2. Gravity
-    capy.vy += this.gravity * dt;
+    // 2. Gravity and Jetpack Thrust
+    if (capy.isThrusting) {
+      // Upward thrust opposes downward gravity
+      capy.vy += (this.gravity - this.jetpackThrust) * dt;
+    } else {
+      capy.vy += this.gravity * dt;
+    }
 
     // 3. Integrate position
     capy.x += capy.vx * dt;

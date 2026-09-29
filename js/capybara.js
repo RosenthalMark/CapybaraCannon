@@ -28,6 +28,8 @@ export class Capybara {
     this.isSliding = false;
     this.glideBoostTimer = 0; // for hot springs or citrus turbo
     this.crawlTimer = 0;
+    this.hasJetpack = false;
+    this.isThrusting = false;
   }
 
   reset(x, y) {
@@ -46,6 +48,8 @@ export class Capybara {
     this.isSliding = false;
     this.glideBoostTimer = 0;
     this.crawlTimer = 0;
+    this.hasJetpack = false;
+    this.isThrusting = false;
   }
 
   setExpression(expr, duration = 1.0) {
@@ -75,6 +79,13 @@ export class Capybara {
     // Recover squash/stretch smoothly to 1.0
     this.scaleX += (1.0 - this.scaleX) * 12 * dt;
     this.scaleY += (1.0 - this.scaleY) * 12 * dt;
+
+    // Stabilize flight angle toward forward/upward pitch when thrusting
+    if (this.hasJetpack && this.inFlight && this.isThrusting) {
+      const targetAngle = -0.15; // slight upward tilt
+      this.angle += (targetAngle - this.angle) * 8 * dt;
+      this.angularVelocity *= Math.pow(0.85, dt * 60);
+    }
 
     // Rotate with angular velocity
     this.angle += this.angularVelocity * dt;
@@ -166,6 +177,109 @@ export class Capybara {
 
     // 6. The Iconic Yuzu / Orange on Head! 🍊
     this.drawYuzuOnHead(ctx);
+
+    // 7. Jetpack (when equipped)
+    if (this.hasJetpack) {
+      this.drawJetpack(ctx);
+    }
+  }
+
+  drawJetpack(ctx) {
+    ctx.save();
+    // Position on capybara's back
+    ctx.translate(-8, -2);
+
+    // Jetpack Harness / Strap
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-5, -10);
+    ctx.lineTo(8, 10);
+    ctx.stroke();
+
+    // Twin Thruster Canisters
+    const canisterColor = '#94a3b8';
+    const canisterHighlight = '#e2e8f0';
+    const nozzleColor = '#334155';
+
+    // Left canister
+    ctx.fillStyle = canisterColor;
+    ctx.beginPath();
+    ctx.roundRect(-9, -12, 7, 16, 3);
+    ctx.fill();
+    ctx.fillStyle = canisterHighlight;
+    ctx.fillRect(-8, -10, 2, 12);
+
+    // Right canister
+    ctx.fillStyle = canisterColor;
+    ctx.beginPath();
+    ctx.roundRect(0, -12, 7, 16, 3);
+    ctx.fill();
+    ctx.fillStyle = canisterHighlight;
+    ctx.fillRect(1, -10, 2, 12);
+
+    // Red accent stripes
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(-9, -5, 7, 2.5);
+    ctx.fillRect(0, -5, 7, 2.5);
+
+    // Thruster exhaust nozzles
+    ctx.fillStyle = nozzleColor;
+    ctx.beginPath();
+    ctx.moveTo(-10, 4);
+    ctx.lineTo(-2, 4);
+    ctx.lineTo(-3, 8);
+    ctx.lineTo(-9, 8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-1, 4);
+    ctx.lineTo(7, 4);
+    ctx.lineTo(6, 8);
+    ctx.lineTo(0, 8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Animated exhaust flames when thrusting
+    if (this.isThrusting) {
+      const flameLen = 8 + Math.random() * 12;
+
+      // Outer orange flame
+      ctx.fillStyle = '#f97316';
+      // Left flame
+      ctx.beginPath();
+      ctx.moveTo(-9, 8);
+      ctx.lineTo(-3, 8);
+      ctx.lineTo(-6, 8 + flameLen);
+      ctx.closePath();
+      ctx.fill();
+      // Right flame
+      ctx.beginPath();
+      ctx.moveTo(0, 8);
+      ctx.lineTo(6, 8);
+      ctx.lineTo(3, 8 + flameLen);
+      ctx.closePath();
+      ctx.fill();
+
+      // Inner bright yellow flame core
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.moveTo(-8, 8);
+      ctx.lineTo(-4, 8);
+      ctx.lineTo(-6, 8 + flameLen * 0.6);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(1, 8);
+      ctx.lineTo(5, 8);
+      ctx.lineTo(3, 8 + flameLen * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   drawFace(ctx) {

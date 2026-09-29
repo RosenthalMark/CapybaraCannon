@@ -3,6 +3,21 @@
 All notable changes to **Capybara Cannon** are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/) and [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- **Stage 2: First Playable Jetpack Movement**:
+  - Implemented `JETPACK_FLIGHT` finite state machine mode distinguishing ballistic flight from jetpack-controlled flight.
+  - Added deterministic upward thrust acceleration ($1,600\text{ px/s}^2$) via unified `onActionDown()` and release via `onActionUp()`.
+  - Upward acceleration counteracts downward gravity ($680\text{ px/s}^2$), allowing controlled climbs while preserving forward ballistic momentum ($v_x$).
+  - Added flight attitude stabilization when thrusting, orienting the capybara toward a forward climb pitch.
+  - Procedural twin-canister jetpack rendering with animated flickering exhaust flame nozzles and drift particles.
+  - Testable developer triggers: 'J' key on desktop, `#jetpackDevBtn` HUD button for mobile touch, and `?jetpack=1` auto-equip URL query parameter.
+  - Automated Playwright test suite (`tests/test_jetpack_movement.py`) with 7/7 passing tests.
+- **Stage 1: Input Event Abstraction**:
+  - Unified `onActionDown()` and `onActionUp()` input dispatch pipeline across desktop Spacebar, canvas click/touch, and launch button.
+  - Automated Playwright test suite (`tests/test_input_abstraction.py`) with 6/6 passing tests.
+
 ---
 
 ## [0.1.0] - 2026-09-27

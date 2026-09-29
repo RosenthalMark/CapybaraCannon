@@ -37,7 +37,7 @@ class Game {
     this.world = new World();
     this.physics = new PhysicsEngine(this.world);
 
-    // States: 'TITLE', 'AIMING', 'CHARGING', 'FLIGHT', 'STOPPED', 'GAMEOVER'
+    // States: 'TITLE', 'AIMING', 'CHARGING', 'FLIGHT', 'JETPACK_FLIGHT', 'STOPPED', 'GAMEOVER'
     this.state = 'TITLE';
 
     // Launch settings
@@ -146,6 +146,19 @@ class Game {
     this.ui.updateBoosts(this.zenBoosts);
     this.ui.updateHUD(0, 0, 0);
     this.ui.hideResults();
+
+    // Reset Jetpack flight state
+    this.capybara.hasJetpack = false;
+    this.capybara.isThrusting = false;
+    this.ui.setJetpackActive(false);
+
+    // Development / Test mode check: auto-equip jetpack if requested via URL
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('jetpack') === '1' || urlParams.get('testJetpack') === '1') {
+        this.capybara.hasJetpack = true;
+      }
+    } catch (e) {}
   }
 
   bindInputs() {
@@ -175,6 +188,9 @@ class Game {
           this.keys.space = true;
           this.onActionDown();
         }
+      }
+      if (e.code === 'KeyJ' || e.key === 'j' || e.key === 'J') {
+        this.enterJetpackFlight();
       }
     });
 
@@ -215,20 +231,28 @@ class Game {
       this.onActionDown();
     });
 
-    // Aiming by Mouse Drag / Move
+    // Development / Test Jetpack Toggle Button
+    if (this.ui.jetpackDevBtn) {
+      this.ui.jetpackDevBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.enterJetpackFlight();
+      });
+    }
+
+    // Aiming by Mouse Drag / Move & Flight Action Down
     let isAimDragging = false;
     this.canvas.addEventListener('mousedown', (e) => {
       if (this.state === 'AIMING') {
         isAimDragging = true;
         this.aimWithScreenCoords(e.clientX, e.clientY);
-      } else if (this.state === 'FLIGHT') {
+      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
         this.onActionDown();
       }
     });
 
-    // Canvas Touch in Flight
+    // Canvas Touch in Flight / Jetpack
     this.canvas.addEventListener('touchstart', (e) => {
-      if (this.state === 'FLIGHT') {
+      if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
         e.preventDefault();
         this.onActionDown();
       }
@@ -357,12 +381,27 @@ class Game {
       this.audio.resume();
     } else if (this.state === 'FLIGHT') {
       this.triggerZenBoost();
+    } else if (this.state === 'JETPACK_FLIGHT') {
+      this.capybara.isThrusting = true;
     }
   }
 
   onActionUp() {
     if (this.state === 'CHARGING') {
       this.fireCannon();
+    } else if (this.state === 'JETPACK_FLIGHT') {
+      this.capybara.isThrusting = false;
+    }
+  }
+
+  enterJetpackFlight() {
+    this.capybara.hasJetpack = true;
+    if (this.state === 'FLIGHT') {
+      this.state = 'JETPACK_FLIGHT';
+      this.ui.setJetpackActive(true);
+      this.ui.showToast("🎒 JETPACK FLIGHT ENGAGED!", "boost");
+    } else if (this.state === 'AIMING' || this.state === 'CHARGING') {
+      this.ui.showToast("🎒 JETPACK EQUIPPED FOR LAUNCH", "boost");
     }
   }
 
@@ -383,7 +422,12 @@ class Game {
   }
 
   fireCannon() {
-    this.state = 'FLIGHT';
+    if (this.capybara.hasJetpack) {
+      this.state = 'JETPACK_FLIGHT';
+      this.ui.setJetpackActive(true);
+    } else {
+      this.state = 'FLIGHT';
+    }
     this.ui.showLaunchControls(false);
 
     // Calculate launch velocity with exponential punch
@@ -486,7 +530,7 @@ class Game {
     }
 
     // 3. Physics & Capybara update
-    if (this.state === 'FLIGHT') {
+    if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
       this.physics.update(this.capybara, dt, (x, y, intensity) => {
         this.audio.playBounce(intensity);
         this.particles.emitBounce(x, y, intensity);
@@ -494,6 +538,13 @@ class Game {
       });
 
       this.capybara.update(dt);
+
+      // Jetpack thrust particle emission
+      if (this.state === 'JETPACK_FLIGHT' && this.capybara.isThrusting) {
+        const exhaustX = this.capybara.x - 12;
+        const exhaustY = this.capybara.y + 6;
+        this.particles.emitJetpackThrust(exhaustX, exhaustY, this.capybara.angle);
+      }
 
       // Check obstacle collisions
       for (const obs of this.world.obstacles) {
@@ -505,6 +556,7 @@ class Game {
       // Check flight stop
       if (!this.capybara.inFlight) {
         this.state = 'STOPPED';
+        this.capybara.isThrusting = false;
         this.stopDelayTimer = 1.1;
       }
 
@@ -546,7 +598,7 @@ class Game {
     let targetX = this.world.cannonX + 150;
     let targetY = this.world.getGroundY(this.world.cannonX) - 100;
 
-    if (this.state === 'FLIGHT' || this.state === 'STOPPED' || this.state === 'GAMEOVER') {
+    if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'STOPPED' || this.state === 'GAMEOVER') {
       targetX = this.capybara.x + this.capybara.vx * 0.25 + 140;
       targetY = this.capybara.y + this.capybara.vy * 0.15;
 

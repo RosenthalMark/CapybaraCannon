@@ -189,6 +189,13 @@ html, body {
   transform: scale(0.95);
 }
 
+.jetpack-dev-btn.active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #fde68a;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.7);
+  animation: pulseGlow 1s infinite alternate;
+}
+
 /* Toast Messages */
 #toast-container {
   position: absolute;
