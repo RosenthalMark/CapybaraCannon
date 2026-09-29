@@ -6,6 +6,18 @@ This project follows [Semantic Versioning](https://semver.org/) and [Keep a Chan
 ## [Unreleased]
 
 ### Added
+- **Cannon Loading Animation & Occlusion**:
+  - Implemented `CANNON_LOADING` finite state machine state executing a 5-phase physical intro sequence: `ENTER` (ground waddle with stepping paws), `CLIMB` (scramble up carriage wheel to muzzle), `BARREL_ENTRY` (slide into cannon bore), `BARREL_PAUSE` (barrel rumble and muzzle dust puff), and `HEAD_POP` (elastic head pop-out into ready pose).
+  - Split-layer cannon barrel occlusion: Capybara head renders inside the cannon barrel bore with the metallic bronze muzzle rim cleanly overlapping the neck.
+  - Interactive aiming anchor: Capybara head stays visibly loaded at the muzzle, rotating seamlessly with the barrel during `AIMING` and pulling back into the barrel during `CHARGING`.
+  - Added tap / Space fast-forward support to skip directly into aiming/charging.
+  - Automated Playwright test suite (`tests/test_cannon_loading.py`) with 7/7 passing tests.
+- **Decorative Orange Removal**:
+  - Removed decorative `drawYuzuOnHead()` visual presentation from the Capybara character model while 100% preserving floating gameplay Yuzus, Citrus Turbo impulse, Zen Boost awards, stats, and particles.
+- **Jetpack Flight Envelope & Cannon Angle Limits**:
+  - Implemented ground-relative hybrid flight envelope with progressive thrust attenuation across a 120px soft buffer zone (400px–520px altitude) and hard ceiling safety clamp at 520px altitude, preventing infinite vertical climbs while eliminating sticky ceiling hover.
+  - Restricted cannon elevation angles to a playable range of $10^\circ\text{–}60^\circ$ across mouse, touch, and keyboard aiming, ensuring strong horizontal momentum on launch.
+  - Automated Playwright test suite (`tests/test_flight_envelope.py`) with 10/10 passing tests.
 - **Stage 2: First Playable Jetpack Movement**:
   - Implemented `JETPACK_FLIGHT` finite state machine mode distinguishing ballistic flight from jetpack-controlled flight.
   - Added deterministic upward thrust acceleration ($1,600\text{ px/s}^2$) via unified `onActionDown()` and release via `onActionUp()`.

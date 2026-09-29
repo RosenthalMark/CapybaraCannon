@@ -28,6 +28,7 @@ export class Capybara {
     this.isSliding = false;
     this.glideBoostTimer = 0; // for hot springs or citrus turbo
     this.crawlTimer = 0;
+    this.walkCycle = 0;
     this.hasJetpack = false;
     this.isThrusting = false;
   }
@@ -48,6 +49,7 @@ export class Capybara {
     this.isSliding = false;
     this.glideBoostTimer = 0;
     this.crawlTimer = 0;
+    this.walkCycle = 0;
     this.hasJetpack = false;
     this.isThrusting = false;
   }
@@ -111,18 +113,19 @@ export class Capybara {
   drawCapybaraBody(ctx) {
     const furColor = '#935c34';
     const darkFur = '#784620';
-    const snoutColor = '#5e3415';
     const bellyColor = '#a86f44';
-    const innerEar = '#45220c';
 
     // 1. Back Little Legs / Paws (tucked or running)
+    const walkPaw1 = this.walkCycle ? Math.sin(this.walkCycle) * 3 : 0;
+    const walkPaw2 = this.walkCycle ? -Math.sin(this.walkCycle) * 3 : 0;
+
     ctx.fillStyle = darkFur;
     ctx.beginPath();
-    ctx.ellipse(-14, 16, 7, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(-14 + walkPaw1, 16, 7, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.ellipse(12, 16, 7, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(12 + walkPaw2, 16, 7, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // 2. Main Plump Body (rounded loaf shape)
@@ -137,7 +140,27 @@ export class Capybara {
     ctx.ellipse(0, 4, 16, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 3. Iconic Capybara Head & Snout (blocky/regal profile facing right)
+    // 3. Stubby Tail
+    ctx.fillStyle = darkFur;
+    ctx.beginPath();
+    ctx.ellipse(-23, 2, 4, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4. Iconic Capybara Head & Snout (blocky/regal profile facing right)
+    this.drawHead(ctx);
+
+    // 5. Jetpack (when equipped)
+    if (this.hasJetpack) {
+      this.drawJetpack(ctx);
+    }
+  }
+
+  drawHead(ctx) {
+    const furColor = '#935c34';
+    const darkFur = '#784620';
+    const snoutColor = '#5e3415';
+    const innerEar = '#45220c';
+
     // Head base
     ctx.fillStyle = furColor;
     ctx.beginPath();
@@ -166,22 +189,8 @@ export class Capybara {
     ctx.ellipse(4, -22, 3, 2.5, -0.3, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4. Little Stubby Tail
-    ctx.fillStyle = darkFur;
-    ctx.beginPath();
-    ctx.ellipse(-23, 2, 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 5. Facial Expression (Eyes & Mouth)
+    // Facial Expression (Eyes & Mouth)
     this.drawFace(ctx);
-
-    // 6. The Iconic Yuzu / Orange on Head! 🍊
-    this.drawYuzuOnHead(ctx);
-
-    // 7. Jetpack (when equipped)
-    if (this.hasJetpack) {
-      this.drawJetpack(ctx);
-    }
   }
 
   drawJetpack(ctx) {

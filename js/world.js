@@ -339,6 +339,11 @@ export class World {
     ctx.closePath();
     ctx.fill();
 
+    // Hook to render loaded entity (Capybara) inside the barrel before the rim is drawn
+    if (this.onDrawBarrelInterior) {
+      this.onDrawBarrelInterior(ctx, recoilX);
+    }
+
     // Muzzle Rim
     ctx.fillStyle = '#a8a29e';
     ctx.beginPath();

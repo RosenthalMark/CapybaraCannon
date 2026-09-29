@@ -37,8 +37,18 @@ class Game {
     this.world = new World();
     this.physics = new PhysicsEngine(this.world);
 
-    // States: 'TITLE', 'AIMING', 'CHARGING', 'FLIGHT', 'JETPACK_FLIGHT', 'STOPPED', 'GAMEOVER'
+    // States: 'TITLE', 'CANNON_LOADING', 'AIMING', 'CHARGING', 'FLIGHT', 'JETPACK_FLIGHT', 'STOPPED', 'GAMEOVER'
     this.state = 'TITLE';
+
+    // Cannon loading intro animation state
+    this.loadingPhase = 'READY'; // 'ENTER', 'CLIMB', 'BARREL_ENTRY', 'BARREL_PAUSE', 'HEAD_POP', 'READY'
+    this.loadingTimer = 0;
+    this.loadingHeadPeek = 4;
+
+    // Connect cannon interior rendering callback
+    this.world.onDrawBarrelInterior = (ctx, recoilX) => {
+      this.drawLoadedCapybaraInBarrel(ctx, recoilX);
+    };
 
     // Launch settings
     this.power = 0;
@@ -169,6 +179,173 @@ class Game {
     } catch (e) {}
   }
 
+  startCannonLoading() {
+    this.state = 'CANNON_LOADING';
+    this.loadingPhase = 'ENTER';
+    this.loadingTimer = 0;
+    this.loadingHeadPeek = 0;
+    this.ui.showLaunchControls(true);
+
+    // Initial position on ground terrace entering from the left
+    const startX = this.world.cannonX - 120;
+    this.capybara.x = startX;
+    this.capybara.y = this.world.getGroundY(startX) - 14;
+    this.capybara.vx = 0;
+    this.capybara.vy = 0;
+    this.capybara.angle = 0;
+    this.capybara.angularVelocity = 0;
+    this.capybara.walkCycle = 0;
+    this.capybara.setExpression('zen');
+  }
+
+  finishCannonLoading() {
+    this.state = 'AIMING';
+    this.loadingPhase = 'READY';
+    this.loadingHeadPeek = 4;
+    this.loadingTimer = 0;
+    this.world.cannonRecoil = 0;
+    this.capybara.scaleX = 1.0;
+    this.capybara.scaleY = 1.0;
+    this.capybara.walkCycle = 0;
+    this.capybara.setExpression('happy', 1.0);
+    this.ui.showLaunchControls(true);
+
+    const muzzle = this.world.getMuzzlePosition();
+    this.capybara.x = muzzle.x;
+    this.capybara.y = muzzle.y;
+    this.capybara.angle = -this.world.cannonAngle;
+  }
+
+  updateCannonLoading(dt) {
+    this.loadingTimer += dt;
+    const cannonX = this.world.cannonX;
+
+    switch (this.loadingPhase) {
+      case 'ENTER': {
+        const duration = 1.1;
+        const progress = Math.min(1.0, this.loadingTimer / duration);
+        const startX = cannonX - 120;
+        const endX = cannonX - 28;
+
+        this.capybara.x = startX + progress * (endX - startX);
+        const curGround = this.world.getGroundY(this.capybara.x);
+        this.capybara.walkCycle = progress * Math.PI * 10;
+        this.capybara.y = curGround - 14 + Math.abs(Math.sin(this.capybara.walkCycle)) * -3;
+        this.capybara.angle = 0;
+
+        if (this.loadingTimer >= duration) {
+          this.loadingPhase = 'CLIMB';
+          this.loadingTimer = 0;
+          this.capybara.walkCycle = 0;
+        }
+        break;
+      }
+
+      case 'CLIMB': {
+        const duration = 0.6;
+        const progress = Math.min(1.0, this.loadingTimer / duration);
+        const ease = progress * progress * (3 - 2 * progress); // smoothstep
+
+        const startX = cannonX - 28;
+        const startY = this.world.getGroundY(startX) - 14;
+        const muzzle = this.world.getMuzzlePosition();
+
+        this.capybara.x = startX + ease * (muzzle.x - startX);
+        this.capybara.y = startY + ease * (muzzle.y - startY);
+        this.capybara.angle = -this.world.cannonAngle * ease;
+        this.capybara.walkCycle = progress * Math.PI * 6;
+
+        if (this.loadingTimer >= duration) {
+          this.loadingPhase = 'BARREL_ENTRY';
+          this.loadingTimer = 0;
+          this.capybara.walkCycle = 0;
+        }
+        break;
+      }
+
+      case 'BARREL_ENTRY': {
+        const duration = 0.5;
+        const progress = Math.min(1.0, this.loadingTimer / duration);
+
+        const cos = Math.cos(this.world.cannonAngle);
+        const sin = Math.sin(this.world.cannonAngle);
+        const muzzle = this.world.getMuzzlePosition();
+        const slideDistance = 35 * progress;
+
+        this.capybara.x = muzzle.x - cos * slideDistance;
+        this.capybara.y = muzzle.y + sin * slideDistance;
+        this.capybara.angle = -this.world.cannonAngle;
+
+        this.capybara.scaleX = 1.0 - progress * 0.25;
+        this.capybara.scaleY = 1.0 - progress * 0.25;
+
+        if (this.loadingTimer >= duration) {
+          this.loadingPhase = 'BARREL_PAUSE';
+          this.loadingTimer = 0;
+          this.capybara.scaleX = 1.0;
+          this.capybara.scaleY = 1.0;
+          this.particles.emitBounce(muzzle.x, muzzle.y, 0.25);
+        }
+        break;
+      }
+
+      case 'BARREL_PAUSE': {
+        const duration = 0.9;
+        this.world.cannonRecoil = Math.sin(this.loadingTimer * 28) * 1.5;
+
+        if (this.loadingTimer >= duration) {
+          this.loadingPhase = 'HEAD_POP';
+          this.loadingTimer = 0;
+          this.world.cannonRecoil = 0;
+        }
+        break;
+      }
+
+      case 'HEAD_POP': {
+        const duration = 0.35;
+        const progress = Math.min(1.0, this.loadingTimer / duration);
+        const popEase = Math.sin(progress * Math.PI * 0.5 * 1.25);
+        this.loadingHeadPeek = -14 + popEase * 18;
+        this.capybara.setExpression('happy', 1.0);
+
+        if (this.loadingTimer >= duration) {
+          this.finishCannonLoading();
+        }
+        break;
+      }
+    }
+
+    this.capybara.update(dt);
+  }
+
+  drawLoadedCapybaraInBarrel(ctx, recoilX) {
+    if (this.state === 'CANNON_LOADING' && this.loadingPhase === 'BARREL_ENTRY') {
+      ctx.save();
+      const progress = Math.min(1.0, this.loadingTimer / 0.5);
+      const slide = progress * 35;
+      ctx.translate(recoilX + 54 - slide - 14, 0);
+      const scale = 1.0 - progress * 0.25;
+      ctx.scale(scale, scale);
+      this.capybara.drawHead(ctx);
+      ctx.restore();
+      return;
+    }
+
+    const isPeeking = this.state === 'AIMING' || this.state === 'CHARGING' ||
+      (this.state === 'CANNON_LOADING' && (this.loadingPhase === 'HEAD_POP' || this.loadingPhase === 'READY'));
+
+    if (isPeeking) {
+      ctx.save();
+      let peek = this.loadingHeadPeek ?? 4;
+      if (this.state === 'CHARGING') {
+        peek -= this.power * 6; // pull back slightly during charge
+      }
+      ctx.translate(recoilX + 54 + peek - 14, 0);
+      this.capybara.drawHead(ctx);
+      ctx.restore();
+    }
+  }
+
   bindInputs() {
     // Title music unlock on user gesture
     const unlockTitleAudio = () => {
@@ -253,6 +430,8 @@ class Game {
       if (this.state === 'AIMING') {
         isAimDragging = true;
         this.aimWithScreenCoords(e.clientX, e.clientY);
+      } else if (this.state === 'CANNON_LOADING') {
+        this.finishCannonLoading();
       } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
         this.onActionDown();
       }
@@ -260,7 +439,10 @@ class Game {
 
     // Canvas Touch in Flight / Jetpack
     this.canvas.addEventListener('touchstart', (e) => {
-      if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
+      if (this.state === 'CANNON_LOADING') {
+        e.preventDefault();
+        this.finishCannonLoading();
+      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
         e.preventDefault();
         this.onActionDown();
       }
@@ -299,6 +481,7 @@ class Game {
 
     this.ui.replayBtn.addEventListener('click', () => {
       this.resetRun();
+      this.startCannonLoading();
     });
 
     // Title Screen Navigation Buttons
@@ -307,7 +490,7 @@ class Game {
       this.audio.stopTitleMusic();
       this.ui.showTitleScreen(false);
       this.resetRun();
-      this.state = 'AIMING';
+      this.startCannonLoading();
     });
 
     this.ui.titleShopBtn.addEventListener('click', (e) => {
@@ -383,6 +566,15 @@ class Game {
       }
       return;
     }
+    if (this.state === 'CANNON_LOADING') {
+      this.finishCannonLoading();
+      this.state = 'CHARGING';
+      this.power = this.minPower;
+      this.powerDirection = 1;
+      this.ui.setChargingState(true);
+      this.audio.resume();
+      return;
+    }
     if (this.state === 'AIMING') {
       this.state = 'CHARGING';
       this.power = this.minPower;
@@ -439,6 +631,8 @@ class Game {
       this.state = 'FLIGHT';
     }
     this.ui.showLaunchControls(false);
+    this.loadingPhase = null;
+    this.capybara.walkCycle = 0;
 
     // Calculate launch velocity with exponential punch
     const angle = this.world.cannonAngle;
@@ -515,6 +709,11 @@ class Game {
   }
 
   update(dt) {
+    // 0. Cannon loading intro animation
+    if (this.state === 'CANNON_LOADING') {
+      this.updateCannonLoading(dt);
+    }
+
     // 1. Aiming angle keyboard controls
     if (this.state === 'AIMING' || this.state === 'CHARGING') {
       const angleSpeed = 1.0 * dt;
@@ -670,8 +869,13 @@ class Game {
       this.drawTrajectoryGuide(this.ctx);
     }
 
-    // 5. Draw Capybara
-    this.capybara.draw(this.ctx);
+    // 5. Draw Capybara (when not loaded/occluded inside the cannon barrel)
+    const isLoadedInBarrel = this.state === 'AIMING' || this.state === 'CHARGING' ||
+      (this.state === 'CANNON_LOADING' && (this.loadingPhase === 'BARREL_ENTRY' || this.loadingPhase === 'BARREL_PAUSE' || this.loadingPhase === 'HEAD_POP' || this.loadingPhase === 'READY'));
+
+    if (!isLoadedInBarrel) {
+      this.capybara.draw(this.ctx);
+    }
 
     // 6. Draw World Particles (smoke, explosions, sparkles)
     this.particles.draw(this.ctx);
