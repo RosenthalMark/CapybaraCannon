@@ -24,7 +24,8 @@ def test_desktop_spacebar_charge_and_launch():
 
         # Start game from title screen
         page.click("#titlePlayBtn")
-        page.wait_for_timeout(200)
+        page.evaluate("() => window.game.finishCannonLoading()")
+        page.wait_for_timeout(50)
 
         # Confirm initial state is AIMING
         state = page.evaluate("() => window.game.state")
@@ -62,7 +63,8 @@ def test_mouse_launch_button_charge_and_launch():
         page.wait_for_selector("#titleScreen:not(.hidden)")
 
         page.click("#titlePlayBtn")
-        page.wait_for_timeout(200)
+        page.evaluate("() => window.game.finishCannonLoading()")
+        page.wait_for_timeout(50)
 
         state = page.evaluate("() => window.game.state")
         assert state == "AIMING", f"Expected AIMING, got {state}"
@@ -98,7 +100,8 @@ def test_touch_launch_button_charge_and_launch():
         page.wait_for_selector("#titleScreen:not(.hidden)")
 
         page.click("#titlePlayBtn")
-        page.wait_for_timeout(200)
+        page.evaluate("() => window.game.finishCannonLoading()")
+        page.wait_for_timeout(50)
 
         state = page.evaluate("() => window.game.state")
         assert state == "AIMING", f"Expected AIMING, got {state}"
@@ -138,7 +141,8 @@ def test_spacebar_key_repeat_deduplication():
         page.wait_for_selector("#titleScreen:not(.hidden)")
 
         page.click("#titlePlayBtn")
-        page.wait_for_timeout(200)
+        page.evaluate("() => window.game.finishCannonLoading()")
+        page.wait_for_timeout(50)
 
         # Initial press
         page.keyboard.down("Space")
@@ -176,7 +180,8 @@ def test_in_flight_action_routing():
         page.wait_for_selector("#titleScreen:not(.hidden)")
 
         page.click("#titlePlayBtn")
-        page.wait_for_timeout(200)
+        page.evaluate("() => window.game.finishCannonLoading()")
+        page.wait_for_timeout(50)
 
         # Fire cannon into flight
         page.keyboard.down("Space")
