@@ -62,7 +62,7 @@ def test_jetpack_entry_via_dev_button():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(viewport=VIEWPORT_1080P)
-        page.goto(BASE_URL)
+        page.goto(f"{BASE_URL}/?debug=1")
 
         launch_into_flight(page)
 

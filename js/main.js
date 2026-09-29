@@ -152,9 +152,17 @@ class Game {
     this.capybara.isThrusting = false;
     this.ui.setJetpackActive(false);
 
-    // Development / Test mode check: auto-equip jetpack if requested via URL
+    // Development / Test mode check: auto-equip jetpack or show dev button if requested via URL
     try {
       const urlParams = new URLSearchParams(window.location.search);
+      const isDevMode = urlParams.get('debug') === '1' || urlParams.get('testJetpack') === '1' || urlParams.get('jetpack') === '1';
+      if (this.ui.jetpackDevBtn) {
+        if (isDevMode) {
+          this.ui.jetpackDevBtn.classList.remove('hidden');
+        } else {
+          this.ui.jetpackDevBtn.classList.add('hidden');
+        }
+      }
       if (urlParams.get('jetpack') === '1' || urlParams.get('testJetpack') === '1') {
         this.capybara.hasJetpack = true;
       }
@@ -712,5 +720,14 @@ window.addEventListener('DOMContentLoaded', () => {
     const shouldEnable = enable !== undefined ? enable : !document.body.classList.contains('debug-hitboxes');
     document.body.classList.toggle('debug-hitboxes', shouldEnable);
     return shouldEnable;
+  };
+
+  window.toggleJetpackDebug = (enable) => {
+    const btn = document.getElementById('jetpackDevBtn');
+    if (!btn) return false;
+    const isHidden = btn.classList.contains('hidden');
+    const shouldShow = enable !== undefined ? enable : isHidden;
+    btn.classList.toggle('hidden', !shouldShow);
+    return shouldShow;
   };
 });

@@ -184,16 +184,27 @@ export class UIManager {
   }
 
   updateBoosts(boostsRemaining) {
-    const pips = this.boostPips.children;
-    for (let i = 0; i < pips.length; i++) {
-      if (i < boostsRemaining) {
-        pips[i].classList.add('active');
-      } else {
-        pips[i].classList.remove('active');
+    this.currentBoosts = Math.max(0, Math.floor(boostsRemaining));
+    if (!this.boostPips) return;
+
+    this.boostPips.innerHTML = '';
+    if (this.currentBoosts === 0) {
+      const pip = document.createElement('span');
+      pip.className = 'pip';
+      pip.title = 'No Zen Boost Available';
+      pip.textContent = '🍊';
+      this.boostPips.appendChild(pip);
+    } else {
+      for (let i = 0; i < this.currentBoosts; i++) {
+        const pip = document.createElement('span');
+        pip.className = 'pip active';
+        pip.title = `Zen Boost (${i + 1}/${this.currentBoosts})`;
+        pip.textContent = '🍊';
+        this.boostPips.appendChild(pip);
       }
     }
 
-    if (boostsRemaining > 0) {
+    if (this.currentBoosts > 0) {
       this.airBoostTrigger.classList.remove('hidden');
     } else {
       this.airBoostTrigger.classList.add('hidden');
@@ -218,12 +229,10 @@ export class UIManager {
       if (this.boostsCard) {
         const label = this.boostsCard.querySelector('.hud-label');
         if (label) label.textContent = 'ZEN BOOST';
-        if (this.boostPips) {
-          this.boostPips.innerHTML = '<span class="pip active" title="Zen Boost">🍊</span>';
-        }
         const hint = this.boostsCard.querySelector('.boost-hint');
         if (hint) hint.textContent = '[SPACE / TAP]';
       }
+      this.updateBoosts(this.currentBoosts ?? 1);
       if (this.jetpackDevBtn) {
         this.jetpackDevBtn.classList.remove('active');
       }

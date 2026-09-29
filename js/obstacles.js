@@ -189,6 +189,10 @@ export class Yuzu extends Obstacle {
     capy.vx = Math.max(capy.vx + 260, 550);
     capy.vy = Math.min(capy.vy - 160, -180);
     capy.glideBoostTimer = 1.2;
+
+    // Award +1 available Zen Boost
+    engine.zenBoosts++;
+    engine.ui.updateBoosts(engine.zenBoosts);
   }
 
   draw(ctx) {
