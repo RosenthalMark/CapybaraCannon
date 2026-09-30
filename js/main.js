@@ -94,8 +94,11 @@ class Game {
     this.keys = {
       up: false,
       down: false,
+      left: false,
+      right: false,
       space: false
     };
+    this.touchSteerDirection = 0; // -1: left, 1: right
 
     this.init();
   }
@@ -196,6 +199,7 @@ class Game {
     this.loadingHeadPeek = 0;
     this.ui.showLaunchControls(true);
     if (this.world) this.world.cannonLCDState = 1;
+    this.capybara.isGrounded = true;
     if (this.capybara.anim) this.capybara.anim.play('run');
 
     // Initial position on ground terrace entering from the left
@@ -335,8 +339,8 @@ class Game {
     if (this.state === 'CANNON_LOADING' && this.loadingPhase === 'BARREL_ENTRY') {
       ctx.save();
       const progress = Math.min(1.0, this.loadingTimer / 0.5);
-      const slide = progress * 35;
-      ctx.translate(recoilX + 54 - slide - 14, 0);
+      const slide = progress * 30;
+      ctx.translate(recoilX + 66 - slide, -86);
       const scale = 1.0 - progress * 0.25;
       ctx.scale(scale, scale);
       this.capybara.drawHead(ctx);
@@ -351,9 +355,10 @@ class Game {
       ctx.save();
       let peek = this.loadingHeadPeek ?? 4;
       if (this.state === 'CHARGING') {
-        peek -= this.power * 6; // pull back slightly during charge
+        peek -= this.power * 8; // pull back slightly during charge
       }
-      ctx.translate(recoilX + 54 + peek - 14, 0);
+      ctx.translate(recoilX + 66 + peek, -86);
+      ctx.rotate(-this.world.cannonAngle * 0.4);
       this.capybara.drawHead(ctx);
       ctx.restore();
     }
@@ -380,6 +385,12 @@ class Game {
       if (e.code === 'ArrowDown' || e.key === 's' || e.key === 'S') {
         this.keys.down = true;
       }
+      if (e.code === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        this.keys.left = true;
+      }
+      if (e.code === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        this.keys.right = true;
+      }
       if (e.code === 'Space') {
         e.preventDefault();
         if (!this.keys.space) {
@@ -398,6 +409,12 @@ class Game {
       }
       if (e.code === 'ArrowDown' || e.key === 's' || e.key === 'S') {
         this.keys.down = false;
+      }
+      if (e.code === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        this.keys.left = false;
+      }
+      if (e.code === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        this.keys.right = false;
       }
       if (e.code === 'Space') {
         e.preventDefault();
@@ -445,21 +462,50 @@ class Game {
         this.aimWithScreenCoords(e.clientX, e.clientY);
       } else if (this.state === 'CANNON_LOADING') {
         this.finishCannonLoading();
-      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
+      } else if (this.state === 'PARACHUTE_GLIDE') {
+        // Click left or right of center to steer parachute
+        this.touchSteerDirection = e.clientX < window.innerWidth * 0.5 ? -1 : 1;
+      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'RUNNER') {
         this.onActionDown();
       }
     });
 
-    // Canvas Touch in Flight / Jetpack / Runner
+    window.addEventListener('mouseup', () => {
+      isAimDragging = false;
+      this.touchSteerDirection = 0;
+    });
+
+    // Canvas Touch in Flight / Jetpack / Parachute / Runner
     this.canvas.addEventListener('touchstart', (e) => {
       if (this.state === 'CANNON_LOADING') {
         e.preventDefault();
         this.finishCannonLoading();
-      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
+      } else if (this.state === 'PARACHUTE_GLIDE') {
+        e.preventDefault();
+        const touch = e.touches[0];
+        if (touch) {
+          this.touchSteerDirection = touch.clientX < window.innerWidth * 0.5 ? -1 : 1;
+        }
+      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'RUNNER') {
         e.preventDefault();
         this.onActionDown();
       }
     }, { passive: false });
+
+    this.canvas.addEventListener('touchmove', (e) => {
+      if (this.state === 'PARACHUTE_GLIDE') {
+        const touch = e.touches[0];
+        if (touch) {
+          this.touchSteerDirection = touch.clientX < window.innerWidth * 0.5 ? -1 : 1;
+        }
+      } else if ((this.state === 'AIMING' || this.state === 'CHARGING') && e.touches[0]) {
+        this.aimWithScreenCoords(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+      this.touchSteerDirection = 0;
+    });
 
     this.canvas.addEventListener('mousemove', (e) => {
       if (isAimDragging && (this.state === 'AIMING' || this.state === 'CHARGING')) {
@@ -607,22 +653,23 @@ class Game {
         this.state = 'JETPACK_FLIGHT';
         this.capybara.isThrusting = true;
       } else if (this.capybara.isGrounded) {
-        // Ground Jump
-        this.capybara.vy = -540;
+        // Ground Jump - split-second snappy jump
+        this.capybara.vy = -620;
+        this.capybara.y -= 6;
         this.capybara.isGrounded = false;
         this.capybara.hasDoubleJumped = false;
         if (this.capybara.anim) {
-          this.capybara.anim.play('jump');
+          this.capybara.anim.play('jump', true);
         }
-        this.audio.playBounce(0.3);
+        this.audio.playBounce(0.35);
       } else if (!this.capybara.hasDoubleJumped) {
-        // Mid-air Double Jump
-        this.capybara.vy = -480;
+        // Mid-air Double Jump - split-second responsive
+        this.capybara.vy = -560;
         this.capybara.hasDoubleJumped = true;
         if (this.capybara.anim) {
-          this.capybara.anim.play('double_jump');
+          this.capybara.anim.play('double_jump', true);
         }
-        this.audio.playBounce(0.5);
+        this.audio.playBounce(0.55);
       }
     } else if (this.state === 'PARACHUTE_GLIDE') {
       // Gliding down with parachute
@@ -646,9 +693,11 @@ class Game {
     this.ui.setJetpackActive(true);
     this.ui.updateJetpackFuel(this.jetpackFuel / this.jetpackMaxFuel);
 
-    if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
+    if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE') {
       this.state = 'JETPACK_FLIGHT';
       this.ui.showToast("🎒 JETPACK ENGAGED!", "boost");
+    } else if (this.state === 'RUNNER') {
+      this.ui.showToast("🎒 JETPACK COLLECTED! TAP SPACE TO FLY!", "boost");
     } else if (this.state === 'AIMING' || this.state === 'CHARGING') {
       this.ui.showToast("🎒 JETPACK EQUIPPED FOR LAUNCH", "boost");
     }
@@ -679,10 +728,13 @@ class Game {
     this.state = 'PARACHUTE_GLIDE';
     this.capybara.isParachuting = true;
     this.capybara.isThrusting = false;
+    this.touchSteerDirection = 0;
+    // Aerodynamic canopy drag decelerates high-speed ballistic flight into a steady glide
+    this.capybara.vx = Math.min(360, Math.max(140, this.capybara.vx));
     if (this.capybara.anim) {
       this.capybara.anim.play('parachute_deploy');
     }
-    this.ui.showToast("🪂 PARACHUTE DEPLOYED!", "yuzu");
+    this.ui.showToast("🪂 PARACHUTE DEPLOYED! (Steer: ← / → or Tap L/R)", "yuzu");
   }
 
   toggleJetpack() {
@@ -859,6 +911,25 @@ class Game {
         this.ui.updateJetpackFuel(this.jetpackFuel / this.jetpackMaxFuel);
       }
 
+      // Parachute gliding steering (Left / Right arrows or Phone screen Left / Right tap)
+      if (this.state === 'PARACHUTE_GLIDE') {
+        let steer = 0;
+        if (this.keys.left) steer -= 1;
+        if (this.keys.right) steer += 1;
+        if (this.touchSteerDirection !== 0) steer += this.touchSteerDirection;
+
+        if (steer < 0) {
+          this.capybara.vx = Math.max(90, this.capybara.vx - 320 * dt);
+          this.capybara.angle = Math.max(-0.24, this.capybara.angle - 2.0 * dt);
+        } else if (steer > 0) {
+          this.capybara.vx = Math.min(540, this.capybara.vx + 320 * dt);
+          this.capybara.angle = Math.min(0.24, this.capybara.angle + 2.0 * dt);
+        } else {
+          // Gently return to level gliding
+          this.capybara.angle += (0 - this.capybara.angle) * 3.5 * dt;
+        }
+      }
+
       // Check ground touchdown transitions
       if (this.capybara.isGrounded) {
         if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE') {
@@ -937,18 +1008,22 @@ class Game {
       const groundY = this.world.getGroundY(this.capybara.x);
       targetY = Math.min(targetY, groundY - 140);
 
-      // Dynamic Zoom based on speed and altitude
+      // Dynamic Zoom based on mode, speed, and altitude (closer up for readability & cute capy)
       const speed = Math.sqrt(this.capybara.vx ** 2 + this.capybara.vy ** 2);
       const altitude = Math.max(0, groundY - this.capybara.y);
 
-      if (speed > 800 || altitude > 700) {
-        this.camera.targetZoom = 0.58;
-      } else if (speed > 400 || altitude > 350) {
-        this.camera.targetZoom = 0.78;
+      if (this.state === 'RUNNER') {
+        this.camera.targetZoom = 1.38; // Close-up view for responsive platformer jumping & obstacles
+      } else if (this.state === 'PARACHUTE_GLIDE') {
+        this.camera.targetZoom = 1.22; // Comfortable zoom to see parachute canopy and landing
       } else if (this.state === 'STOPPED' || this.state === 'GAMEOVER') {
-        this.camera.targetZoom = 1.15; // close up on cute chill capybara!
+        this.camera.targetZoom = 1.45; // Close-up on cute chill/dizzy capybara!
+      } else if (speed > 850 || altitude > 700) {
+        this.camera.targetZoom = 0.68;
+      } else if (speed > 450 || altitude > 350) {
+        this.camera.targetZoom = 0.88;
       } else {
-        this.camera.targetZoom = 0.95;
+        this.camera.targetZoom = 1.08;
       }
     } else {
       this.camera.targetZoom = 1.0;

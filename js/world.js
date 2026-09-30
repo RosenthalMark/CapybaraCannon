@@ -151,8 +151,8 @@ export class World {
     const startItems = [
       { x: 500, type: 'trampoline' },
       { x: 920, type: 'yuzu' },
-      { x: 1350, type: 'cactus' },
-      { x: 1800, type: 'jetpack' }
+      { x: 1380, type: 'yuzu' },
+      { x: 2500, type: 'jetpack' }
     ];
 
     for (const item of startItems) {
@@ -308,116 +308,58 @@ export class World {
     const x = this.cannonX;
     const y = this.getGroundY(x);
 
-    // 1. Explosive 12-Frame Detonation Sequence on Fire
-    if (this.cannonBlastPlayer && this.cannonBlastPlayer.currentAnim === 'cannon_blast' && !this.cannonBlastPlayer.isFinished) {
-      const rect = GlobalSprites.getFrameRect('cannon_blast', this.cannonBlastPlayer.frameIndex);
-      if (rect) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.drawImage(rect.img, rect.sx, rect.sy, rect.sw, rect.sh, -65, -100, 180, 135);
-        ctx.restore();
-        return;
-      }
+    const destW = 240;
+    const destH = 180;
+    const drawX = -70;
+    const drawY = -172;
+
+    // Check if blast animation is playing
+    let frameIndex = 0;
+    if (this.cannonBlastPlayer && this.cannonBlastPlayer.currentAnim === 'cannon_blast') {
+      frameIndex = this.cannonBlastPlayer.frameIndex;
     }
+
+    const rect = GlobalSprites.getFrameRect('cannon_blast', frameIndex);
 
     ctx.save();
     ctx.translate(x, y);
 
-    // Wooden Carriage Wheels
-    ctx.fillStyle = '#78350f';
-    ctx.beginPath();
-    ctx.arc(0, -18, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#451a03';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    // Wheel spokes
-    ctx.lineWidth = 2;
-    for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
-      ctx.beginPath();
-      ctx.moveTo(0, -18);
-      ctx.lineTo(Math.cos(a) * 16, -18 + Math.sin(a) * 16);
-      ctx.stroke();
+    // If capybara is peeking out of the cannon barrel before fire
+    if (this.onDrawBarrelInterior && (this.cannonBlastPlayer?.isFinished ?? true) && frameIndex === 0) {
+      this.onDrawBarrelInterior(ctx, -this.cannonRecoil);
     }
 
-    // Hubcap
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(0, -18, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Render Neon LCD Screen on Carriage
-    const lcd = GlobalSprites.getLCDFrame(this.cannonLCDState ?? 0);
-    if (lcd) {
-      ctx.save();
-      ctx.translate(-14, -6);
-      ctx.fillStyle = '#050510';
-      ctx.fillRect(-12, -8, 24, 16);
-      ctx.strokeStyle = '#06b6d4';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-12, -8, 24, 16);
-      ctx.drawImage(lcd.img, lcd.sx, lcd.sy, lcd.sw, lcd.sh, -11, -7, 22, 14);
-      ctx.restore();
+    // Render custom cannon sprite
+    if (rect) {
+      ctx.drawImage(rect.img, rect.sx, rect.sy, rect.sw, rect.sh, drawX - this.cannonRecoil, drawY, destW, destH);
     }
-
-    // Cannon Barrel Pivot
-    ctx.translate(0, -22);
-    ctx.rotate(-this.cannonAngle); // negative because canvas Y is down
-
-    // Recoil offset
-    const recoilX = -this.cannonRecoil;
-
-    // Bronze Cannon Barrel
-    const grad = ctx.createLinearGradient(recoilX, -16, recoilX, 16);
-    grad.addColorStop(0, '#78716c');
-    grad.addColorStop(0.3, '#d6d3d1');
-    grad.addColorStop(0.7, '#57534e');
-    grad.addColorStop(1, '#292524');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    // Barrel taper
-    ctx.moveTo(recoilX - 12, -16);
-    ctx.lineTo(recoilX + 54, -13);
-    ctx.lineTo(recoilX + 54, 13);
-    ctx.lineTo(recoilX - 12, 16);
-    ctx.closePath();
-    ctx.fill();
-
-    // Hook to render loaded entity (Capybara) inside the barrel before the rim is drawn
-    if (this.onDrawBarrelInterior) {
-      this.onDrawBarrelInterior(ctx, recoilX);
-    }
-
-    // Muzzle Rim
-    ctx.fillStyle = '#a8a29e';
-    ctx.beginPath();
-    ctx.ellipse(recoilX + 54, 0, 4, 15, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#1c1917';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Cannon Base Knob
-    ctx.fillStyle = '#44403c';
-    ctx.beginPath();
-    ctx.arc(recoilX - 12, 0, 9, 0, Math.PI * 2);
-    ctx.fill();
 
     ctx.restore();
   }
 
   getMuzzlePosition() {
     const baseY = this.getGroundY(this.cannonX);
-    const pivotY = baseY - 22;
-    const len = this.cannonLength + 6;
+    // Align directly with the custom cannon barrel opening in the artwork
     const cos = Math.cos(this.cannonAngle);
     const sin = Math.sin(this.cannonAngle);
+    const muzzleOffsetX = 66 + cos * 10;
+    const muzzleOffsetY = -86 - sin * 10;
 
     return {
-      x: this.cannonX + cos * len,
-      y: pivotY - sin * len
+      x: this.cannonX + muzzleOffsetX,
+      y: baseY + muzzleOffsetY
     };
+  }
+
+  get cannonImage() {
+    return GlobalSprites.images.get('cannon_launch') || null;
+  }
+
+  get cannonLaunchAnimActive() {
+    return this.cannonBlastPlayer ? this.cannonBlastPlayer.isPlaying : false;
+  }
+
+  get cannonLaunchFrame() {
+    return this.cannonBlastPlayer ? this.cannonBlastPlayer.frameIndex : 0;
   }
 }

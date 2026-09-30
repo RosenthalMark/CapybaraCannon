@@ -75,10 +75,14 @@ export class PhysicsEngine {
       if (capy.vy > 130) {
         capy.vy = 130;
       }
-      // Maintain forward gliding momentum
-      if (capy.vx < 260) {
-        capy.vx += 200 * dt;
+      // Maintain base forward gliding momentum if slow
+      if (capy.vx < 120) {
+        capy.vx += 160 * dt;
       }
+    } else if (capy.isRunning && !capy.isGrounded) {
+      // Snappy platformer gravity for split-second responsive runner jumps!
+      const runnerGravity = 1150;
+      capy.vy += runnerGravity * dt;
     } else {
       capy.vy += this.gravity * dt;
     }
@@ -124,75 +128,61 @@ export class PhysicsEngine {
       const vDotT = capy.vx * tx + capy.vy * ty;
 
       if (vDotN < 0) {
-        // Bounce restitution
-        const restitution = capy.glideBoostTimer > 0 ? 0.65 : this.groundRestitution;
-        let newVn = -vDotN * restitution;
-
-        // Tangent friction on impact
-        const friction = capy.glideBoostTimer > 0 ? 0.98 : this.groundFriction;
-        let newVt = vDotT * friction;
-
-        // Micro-bounce threshold: if vertical bounce is too small, stick to ground
-        if (Math.abs(newVn) < 48) {
-          newVn = 0;
-          capy.isGrounded = true;
-          capy.isSliding = true;
-        }
-
-        // Recombine velocity
-        capy.vx = tx * newVt + nx * newVn;
-        capy.vy = ty * newVt + ny * newVn;
-
-        // Tumble angular velocity
-        capy.angularVelocity = (newVt / capy.radius) * 1.5;
-
-        // Impact callback (particles, sound)
+        // Fluid touchdown: absorb downward velocity directly into running (zero bounce)
         const impactSpeed = Math.abs(vDotN);
-        if (impactSpeed > 45) {
-          capy.triggerSquash(Math.max(0.45, 1.0 - impactSpeed / 900));
-          if (onBounce) {
-            onBounce(capy.x, groundY, impactSpeed / 600);
-          }
+        capy.triggerSquash(Math.max(0.65, 1.0 - impactSpeed / 900));
+        if (onBounce && impactSpeed > 60) {
+          onBounce(capy.x, groundY, impactSpeed / 800);
         }
+
+        // Tangent forward velocity preserved along the ground slope
+        const tangentSpeed = Math.max(vDotT, 340);
+        capy.vx = tx * tangentSpeed;
+        capy.vy = ty * tangentSpeed;
+
+        capy.isGrounded = true;
+        capy.isSliding = false;
+        capy.angularVelocity = 0;
       }
 
-      // If grounded or sliding, apply continuous rolling/Coulomb friction
-      if (capy.isGrounded || capy.isSliding || Math.abs(capy.vy) < 50) {
-        capy.isGrounded = true;
+      // Ground contact logic
+      capy.isGrounded = true;
 
-        if (capy.isLethallyHit) {
-          // Only stopped by lethal hazards (e.g. fatal cactus or mud sink)
-          capy.vx = 0;
-          capy.vy = 0;
-          capy.angularVelocity = 0;
-          capy.inFlight = false;
-          capy.isSliding = false;
-          capy.setExpression('dizzy', 999);
+      if (capy.isLethallyHit) {
+        // Only stopped by lethal hazards (e.g. fatal cactus or mud sink)
+        capy.vx = 0;
+        capy.vy = 0;
+        capy.angularVelocity = 0;
+        capy.inFlight = false;
+        capy.isSliding = false;
+        capy.setExpression('dizzy', 999);
+      } else {
+        // HYBRID GAMEPLAY: Hitting the ground alone NEVER ends the run!
+        // Transitions smoothly into Ground Running mode with fluid motion.
+        capy.inFlight = true;
+        capy.isRunning = true;
+        capy.crawlTimer = 0;
+
+        // Align smoothly with terrain slope
+        capy.angle = slope;
+        capy.angularVelocity = 0;
+
+        // Maintain base ground running cruise speed
+        const minRunSpeed = 340;
+        if (capy.vx < minRunSpeed) {
+          capy.vx = Math.min(minRunSpeed, capy.vx + 700 * dt);
         } else {
-          // HYBRID GAMEPLAY: Hitting the ground alone NEVER ends the run!
-          // Transitions smoothly into Ground Running mode.
-          capy.inFlight = true;
-          capy.isRunning = true;
-          capy.crawlTimer = 0;
-
-          // Align angle with terrain slope
-          capy.angle = slope;
-          capy.angularVelocity = 0;
-
-          // Maintain base ground running cruise speed
-          const minRunSpeed = 340;
-          if (capy.vx < minRunSpeed) {
-            capy.vx = Math.min(minRunSpeed, capy.vx + 600 * dt);
-          } else {
-            // Natural ground roll deceleration down toward running cruise speed
-            const rollFrictionDecel = (capy.glideBoostTimer > 0 ? 80 : 240) * dt;
-            capy.vx = Math.max(minRunSpeed, capy.vx - rollFrictionDecel);
-          }
-
-          // Gentle slope speed influence
-          const slopeGravity = Math.sin(slope) * 180 * dt;
-          capy.vx = Math.max(minRunSpeed, capy.vx + slopeGravity);
+          // Smooth deceleration down toward running cruise speed
+          const rollFrictionDecel = (capy.glideBoostTimer > 0 ? 80 : 200) * dt;
+          capy.vx = Math.max(minRunSpeed, capy.vx - rollFrictionDecel);
         }
+
+        // Slope influence: slight downhill acceleration
+        const slopeGravity = Math.sin(slope) * 180 * dt;
+        capy.vx = Math.max(minRunSpeed, capy.vx + slopeGravity);
+
+        // Conform vertical velocity to terrain slope
+        capy.vy = Math.tan(slope) * capy.vx * 0.5;
       }
     } else {
       capy.isGrounded = false;

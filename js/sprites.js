@@ -212,6 +212,10 @@ export class AnimationPlayer {
     this.isFinished = false;
   }
 
+  get isPlaying() {
+    return this.currentAnim !== null && !this.isFinished;
+  }
+
   play(animName, forceRestart = false) {
     if (this.currentAnim === animName && !forceRestart) return;
     this.currentAnim = animName;

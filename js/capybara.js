@@ -12,7 +12,7 @@ export class Capybara {
     this.y = y;
     this.vx = 0;
     this.vy = 0;
-    this.radius = 24; // collision radius
+    this.radius = 28; // collision radius (scaled up for close-up view)
     this.angle = 0;
     this.angularVelocity = 0;
 
@@ -96,22 +96,37 @@ export class Capybara {
     this.scaleX += (1.0 - this.scaleX) * 12 * dt;
     this.scaleY += (1.0 - this.scaleY) * 12 * dt;
 
-    // Stabilize flight angle toward forward/upward pitch when thrusting
-    if (this.hasJetpack && this.inFlight && this.isThrusting) {
-      const targetAngle = -0.15; // slight upward tilt
+    // Smooth airborne / flight angle orientation
+    if (this.isParachuting) {
+      // Parachute stays upright, banking softly to steer tilt
+      this.angularVelocity = 0;
+    } else if (this.isGrounded) {
+      // Grounded: conforms to slope, zero tumble
+      this.angularVelocity = 0;
+    } else if (this.hasJetpack && this.inFlight && this.isThrusting) {
+      const targetAngle = -0.15; // slight upward tilt during thrust
       this.angle += (targetAngle - this.angle) * 8 * dt;
       this.angularVelocity *= Math.pow(0.85, dt * 60);
+    } else if (!this.isGrounded && this.anim.currentAnim !== 'double_jump') {
+      // Free airborne flight: bank smoothly with velocity vector (prevents getting stuck flat!)
+      const targetAngle = Math.atan2(this.vy, Math.max(120, this.vx)) * 0.45;
+      this.angle += (targetAngle - this.angle) * 6 * dt;
+      this.angularVelocity *= Math.pow(0.88, dt * 60);
+    } else {
+      // Jump flip rotation
+      this.angle += this.angularVelocity * dt;
+      this.angularVelocity *= Math.pow(0.96, dt * 60);
     }
-
-    // Rotate with angular velocity
-    this.angle += this.angularVelocity * dt;
-
-    // Angular drag
-    this.angularVelocity *= Math.pow(0.96, dt * 60);
 
     // Sprite animation state selection & update
     if (this.anim) {
-      this.anim.update(dt);
+      // Scale running animation leg-frequency with horizontal velocity
+      let animDt = dt;
+      if (this.isGrounded && this.isRunning && this.anim.currentAnim === 'run') {
+        const speedScale = Math.min(2.4, Math.max(0.85, Math.abs(this.vx) / 340));
+        animDt *= speedScale;
+      }
+      this.anim.update(animDt);
 
       if (this.anim.currentAnim === 'jetpack_eject' && !this.anim.isFinished) {
         // Finish eject animation
@@ -131,6 +146,11 @@ export class Capybara {
         if (Math.abs(this.vx) > 5 || this.walkCycle > 0 || this.isRunning) {
           this.anim.play('run');
         }
+      } else if (this.inFlight && !this.isGrounded && !this.hasJetpack) {
+        // In free airborne flight (e.g. cannon launch), if not jumping, use dynamic airborne pose!
+        if (this.anim.currentAnim === 'run') {
+          this.anim.play('jump');
+        }
       }
     }
   }
@@ -145,13 +165,13 @@ export class Capybara {
 
     if (this.anim && this.anim.canDraw()) {
       if (this.anim.currentAnim === 'dizzy_stars') {
-        this.anim.draw(ctx, 64, 48, 0, -4);
+        this.anim.draw(ctx, 84, 64, 0, -4);
       } else if (this.anim.currentAnim === 'parachute_glide' || this.anim.currentAnim === 'parachute_deploy') {
-        this.anim.draw(ctx, 60, 96, 0, -24);
+        this.anim.draw(ctx, 90, 136, 0, -32);
       } else if (this.anim.currentAnim === 'jump' || this.anim.currentAnim === 'double_jump') {
-        this.anim.draw(ctx, 68, 54, 0, -2);
+        this.anim.draw(ctx, 92, 72, 0, -2);
       } else {
-        this.anim.draw(ctx, 68, 48, 0, 0);
+        this.anim.draw(ctx, 92, 64, 0, 0);
       }
 
       if (this.hasJetpack && !this.isParachuting && (this.inFlight || this.isRunning || this.isThrusting)) {

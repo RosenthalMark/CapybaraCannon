@@ -196,3 +196,84 @@ def test_jetpack_pickup_equips_and_refills_fuel():
         assert state == "JETPACK_FLIGHT", f"Expected state JETPACK_FLIGHT, got {state}"
 
         browser.close()
+
+
+def test_parachute_steering_left_and_right():
+    """Left/Right keys and touch steering modulate vx and bank angle during parachute glide."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page, BASE_URL, charge_ms=100)
+
+        # Deploy parachute
+        page.evaluate("() => window.game.deployParachute()")
+        assert page.evaluate("() => window.game.state") == "PARACHUTE_GLIDE"
+
+        # Baseline velocity
+        vx_initial = page.evaluate("() => window.game.capybara.vx")
+
+        # Steer Left via key
+        page.keyboard.down("ArrowLeft")
+        page.wait_for_timeout(200)
+        page.keyboard.up("ArrowLeft")
+
+        vx_steer_left = page.evaluate("() => window.game.capybara.vx")
+        angle_left = page.evaluate("() => window.game.capybara.angle")
+        assert vx_steer_left < vx_initial, f"Steering left should reduce vx: {vx_steer_left} < {vx_initial}"
+        assert angle_left < 0, f"Steering left should bank left (negative angle): {angle_left}"
+
+        # Steer Right via touchSteerDirection
+        page.evaluate("() => { window.game.touchSteerDirection = 1; }")
+        page.wait_for_timeout(300)
+        page.evaluate("() => { window.game.touchSteerDirection = 0; }")
+
+        vx_steer_right = page.evaluate("() => window.game.capybara.vx")
+        assert vx_steer_right > vx_steer_left, f"Steering right should increase vx: {vx_steer_right} > {vx_steer_left}"
+
+        browser.close()
+
+
+def test_custom_cannon_sprite_and_launch_blast():
+    """Custom cannon sprite is loaded from assets/canon/cannon_launch_sequence.png and blasts on fire."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        page.goto(BASE_URL)
+        page.wait_for_selector("#titleScreen:not(.hidden)")
+        page.click("#titlePlayBtn")
+
+        # Check world cannon image src
+        cannon_src = page.evaluate("() => window.game.world.cannonImage?.src || ''")
+        assert "cannon_launch_sequence.png" in cannon_src, f"Expected custom cannon sequence sprite, got {cannon_src}"
+
+        # Fire cannon and verify blast animation starts
+        page.evaluate("() => { window.game.finishCannonLoading(); window.game.fireCannon(); }")
+        is_blasting = page.evaluate("() => window.game.world.cannonLaunchAnimActive")
+        blast_frame = page.evaluate("() => window.game.world.cannonLaunchFrame")
+
+        assert is_blasting is True, "Cannon blast animation should be active upon firing"
+        assert blast_frame >= 0, "Cannon blast frame should be valid index"
+
+        browser.close()
+
+
+def test_responsive_runner_jumps_and_camera_zoom():
+    """Runner jumps have snappy platformer velocity and camera operates at close-up zoom."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page, BASE_URL, charge_ms=10)
+
+        # Wait for RUNNER mode
+        page.wait_for_function("() => window.game.state === 'RUNNER'", timeout=8000)
+
+        zoom_runner = page.evaluate("() => window.game.camera.targetZoom")
+        assert zoom_runner >= 1.35, f"Expected close-up camera zoom >= 1.35 in RUNNER mode, got {zoom_runner}"
+
+        # Trigger snappy ground jump
+        page.keyboard.press("Space")
+        vy = page.evaluate("() => window.game.capybara.vy")
+        assert vy <= -580, f"Expected snappy platformer jump vy <= -580, got {vy}"
+
+        browser.close()
+
