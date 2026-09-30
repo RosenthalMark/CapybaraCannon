@@ -370,6 +370,7 @@ export class Cactus extends Obstacle {
       capy.vy = 0;
       capy.angularVelocity = 0;
       capy.inFlight = false;
+      capy.isLethallyHit = true;
       capy.isSliding = false;
       capy.isGrounded = true;
       capy.setExpression('dizzy', 999);
@@ -385,6 +386,7 @@ export class Cactus extends Obstacle {
         capy.vx = 0;
         capy.vy = 0;
         capy.inFlight = false;
+        capy.isLethallyHit = true;
         capy.isSliding = false;
         capy.isGrounded = true;
         capy.setExpression('dizzy', 999);
@@ -459,6 +461,7 @@ export class MudPit extends Obstacle {
       capy.vx = 0;
       capy.vy = 0;
       capy.inFlight = false;
+      capy.isLethallyHit = true;
       capy.isSliding = false;
       capy.isGrounded = true;
       capy.setExpression('dizzy', 999);
@@ -492,6 +495,70 @@ export class MudPit extends Obstacle {
     ctx.beginPath();
     ctx.arc(-14, -2, Math.max(1, 3 + bubble1 * 0.5), 0, Math.PI * 2);
     ctx.arc(12, -3, Math.max(1, 2.5 - bubble1 * 0.4), 0, Math.PI * 2);
+    ctx.restore();
+  }
+}
+
+export class JetpackPickup extends Obstacle {
+  constructor(x, y) {
+    super(x, y, 'jetpack_pickup');
+    this.width = 44;
+    this.height = 44;
+    this.floatOffset = Math.random() * Math.PI * 2;
+  }
+
+  onCollide(capy, engine) {
+    this.active = false;
+    engine.audio.playBoost();
+    engine.particles.emitZenBoost(this.x, this.y);
+    engine.equipJetpack(true);
+    engine.ui.showToast("🎒 JETPACK PICKUP! HOLD SPACE TO FLY!", "boost");
+  }
+
+  draw(ctx) {
+    if (!this.active) return;
+    const floatY = Math.sin(this.animTimer * 2 + this.floatOffset) * 6;
+
+    ctx.save();
+    ctx.translate(this.x, this.y + floatY);
+
+    // Cyan glowing aura
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.28)';
+    ctx.beginPath();
+    ctx.arc(0, -6, 22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Magenta pulsating outer ring
+    ctx.strokeStyle = '#ec4899';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, -6, 18 + Math.sin(this.animTimer * 4) * 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Twin rocket canisters
+    ctx.fillStyle = '#64748b';
+    ctx.beginPath();
+    ctx.roundRect(-10, -16, 8, 18, 3);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(2, -16, 8, 18, 3);
+    ctx.fill();
+
+    // Red stripes
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(-10, -8, 8, 3);
+    ctx.fillRect(2, -8, 8, 3);
+
+    // Nozzles
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(-9, 2, 6, 4);
+    ctx.fillRect(3, 2, 6, 4);
+
+    // Idle thruster spark glow
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(-6, 8 + Math.sin(this.animTimer * 6) * 2, 2, 0, Math.PI * 2);
+    ctx.arc(6, 8 + Math.sin(this.animTimer * 6) * 2, 2, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();

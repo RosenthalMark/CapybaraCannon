@@ -1,0 +1,198 @@
+"""
+Automated Playwright Test Suite for Hybrid Gameplay:
+1. Toggle Jetpack with 'J' (Dev mode / in-flight toggle).
+2. Toggling off in flight triggers parachute deployment and gliding.
+3. Fuel capacity (~5.5s) drains during thrust; fuel depletion auto-ejects jetpack and deploys parachute.
+4. Ground contact alone NEVER ends the run; transitions into RUNNER mode.
+5. Runner mode single jump and mid-air double jump.
+6. Parachute touchdown smoothly transitions into RUNNER mode.
+7. In-world JetpackPickup collection equips jetpack and refills fuel.
+"""
+
+import pytest
+from playwright.sync_api import sync_playwright
+
+BASE_URL = "http://localhost:8000"
+VIEWPORT_1080P = {"width": 1920, "height": 1080}
+
+
+def launch_game(page, url=BASE_URL, charge_ms=120):
+    """Helper to start game from title and launch from cannon."""
+    page.goto(url)
+    page.wait_for_selector("#titleScreen:not(.hidden)")
+    page.click("#titlePlayBtn")
+    page.evaluate("() => window.game.finishCannonLoading()")
+    page.wait_for_timeout(50)
+
+    # Charge and fire
+    page.keyboard.down("Space")
+    page.wait_for_timeout(charge_ms)
+    page.keyboard.up("Space")
+    page.wait_for_timeout(150)
+
+
+def test_toggle_jetpack_key_j():
+    """Pressing 'J' equips jetpack; pressing 'J' again removes jetpack and deploys parachute."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page)
+
+        # Confirm initial airborne state is FLIGHT
+        state1 = page.evaluate("() => window.game.state")
+        assert state1 == "FLIGHT" or state1 == "RUNNER", f"Expected FLIGHT/RUNNER, got {state1}"
+
+        # Press J to equip jetpack
+        page.keyboard.press("KeyJ")
+        page.wait_for_timeout(100)
+
+        state2 = page.evaluate("() => window.game.state")
+        has_jp2 = page.evaluate("() => window.game.capybara.hasJetpack")
+        assert state2 == "JETPACK_FLIGHT", f"Expected JETPACK_FLIGHT after 1st J, got {state2}"
+        assert has_jp2 is True, "Expected capybara.hasJetpack to be True"
+
+        # Press J again while airborne to toggle off
+        page.keyboard.press("KeyJ")
+        page.wait_for_timeout(100)
+
+        state3 = page.evaluate("() => window.game.state")
+        has_jp3 = page.evaluate("() => window.game.capybara.hasJetpack")
+        is_chute3 = page.evaluate("() => window.game.capybara.isParachuting")
+        assert state3 == "PARACHUTE_GLIDE", f"Expected PARACHUTE_GLIDE after 2nd J, got {state3}"
+        assert has_jp3 is False, "Expected capybara.hasJetpack to be False"
+        assert is_chute3 is True, "Expected capybara.isParachuting to be True"
+
+        browser.close()
+
+
+def test_fuel_depletion_auto_deploys_parachute():
+    """Thrusting drains fuel; reaching 0 auto-ejects jetpack and deploys parachute."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page, f"{BASE_URL}/?jetpack=1")
+
+        # Set fuel to low amount to verify auto-depletion and parachute deploy
+        page.evaluate("() => { window.game.jetpackFuel = 0.15; window.game.state = 'JETPACK_FLIGHT'; }")
+
+        # Hold thrust
+        page.keyboard.down("Space")
+        page.wait_for_timeout(350)
+        page.keyboard.up("Space")
+
+        state = page.evaluate("() => window.game.state")
+        has_jp = page.evaluate("() => window.game.capybara.hasJetpack")
+        is_chute = page.evaluate("() => window.game.capybara.isParachuting")
+
+        assert state == "PARACHUTE_GLIDE" or state == "RUNNER", f"Expected PARACHUTE_GLIDE or RUNNER, got {state}"
+        assert has_jp is False, "Expected jetpack to be auto-ejected"
+
+        browser.close()
+
+
+def test_ground_contact_starts_runner_mode_without_game_over():
+    """Hitting the ground alone NEVER ends the run; it transitions into RUNNER mode."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        # Low power launch to touch down quickly
+        launch_game(page, BASE_URL, charge_ms=20)
+
+        # Wait for capybara to touch ground
+        page.wait_for_function(
+            "() => window.game.capybara.isGrounded === true || window.game.state === 'RUNNER'",
+            timeout=8000
+        )
+
+        state = page.evaluate("() => window.game.state")
+        is_running = page.evaluate("() => window.game.capybara.isRunning")
+        in_flight = page.evaluate("() => window.game.capybara.inFlight")
+        vx = page.evaluate("() => window.game.capybara.vx")
+
+        assert state == "RUNNER", f"Expected RUNNER state on touchdown, got {state}"
+        assert is_running is True, "Expected capybara.isRunning to be True"
+        assert in_flight is True, "Expected capybara.inFlight to remain True (run alive)"
+        assert vx >= 300, f"Expected running cruise speed vx >= 300, got {vx}"
+
+        browser.close()
+
+
+def test_runner_jump_and_double_jump():
+    """In RUNNER mode, action key triggers jump, and mid-air triggers double jump."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page, BASE_URL, charge_ms=20)
+
+        # Wait for RUNNER mode
+        page.wait_for_function("() => window.game.state === 'RUNNER' && window.game.capybara.isGrounded", timeout=8000)
+
+        # First Jump
+        page.keyboard.press("Space")
+        page.wait_for_timeout(80)
+
+        vy1 = page.evaluate("() => window.game.capybara.vy")
+        is_grounded1 = page.evaluate("() => window.game.capybara.isGrounded")
+        assert vy1 < -200, f"Expected upward jump velocity vy < -200, got {vy1}"
+        assert is_grounded1 is False, "Expected capybara.isGrounded to be False"
+
+        # Mid-air Double Jump
+        page.keyboard.press("Space")
+        page.wait_for_timeout(80)
+
+        has_dj = page.evaluate("() => window.game.capybara.hasDoubleJumped")
+        vy2 = page.evaluate("() => window.game.capybara.vy")
+        assert has_dj is True, "Expected capybara.hasDoubleJumped to be True"
+        assert vy2 < -150, f"Expected upward double-jump velocity vy < -150, got {vy2}"
+
+        browser.close()
+
+
+def test_parachute_touchdown_transitions_to_runner():
+    """When floating with parachute, touchdown packs chute and transitions into RUNNER mode."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page, BASE_URL, charge_ms=10)
+
+        # Deploy parachute in air
+        page.evaluate("() => window.game.deployParachute()")
+        state_air = page.evaluate("() => window.game.state")
+        assert state_air == "PARACHUTE_GLIDE"
+
+        # Wait for ground touchdown
+        page.wait_for_function("() => window.game.state === 'RUNNER'", timeout=8000)
+
+        state_land = page.evaluate("() => window.game.state")
+        is_chute = page.evaluate("() => window.game.capybara.isParachuting")
+        is_running = page.evaluate("() => window.game.capybara.isRunning")
+
+        assert state_land == "RUNNER", f"Expected RUNNER, got {state_land}"
+        assert is_chute is False, "Expected parachute to be packed upon touchdown"
+        assert is_running is True, "Expected running mode active"
+
+        browser.close()
+
+
+def test_jetpack_pickup_equips_and_refills_fuel():
+    """JetpackPickup equips jetpack, refills fuel to maximum, and sets JETPACK_FLIGHT."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        launch_game(page, BASE_URL)
+
+        # Deplete fuel or remove jetpack
+        page.evaluate("() => { window.game.capybara.hasJetpack = false; window.game.jetpackFuel = 0; }")
+
+        # Simulate collecting JetpackPickup
+        page.evaluate("() => window.game.equipJetpack(true)")
+
+        has_jp = page.evaluate("() => window.game.capybara.hasJetpack")
+        fuel = page.evaluate("() => window.game.jetpackFuel")
+        state = page.evaluate("() => window.game.state")
+
+        assert has_jp is True, "Expected jetpack equipped"
+        assert fuel == 5.5, f"Expected fuel refilled to 5.5s, got {fuel}"
+        assert state == "JETPACK_FLIGHT", f"Expected state JETPACK_FLIGHT, got {state}"
+
+        browser.close()

@@ -68,6 +68,17 @@ export class PhysicsEngine {
 
       // Upward thrust opposes downward gravity
       capy.vy += (this.gravity - effectiveThrust) * dt;
+    } else if (capy.isParachuting) {
+      // Gentle parachute descent: reduced gravity, terminal fall capped at 130 px/s
+      const chuteGravity = 220;
+      capy.vy += chuteGravity * dt;
+      if (capy.vy > 130) {
+        capy.vy = 130;
+      }
+      // Maintain forward gliding momentum
+      if (capy.vx < 260) {
+        capy.vx += 200 * dt;
+      }
     } else {
       capy.vy += this.gravity * dt;
     }
@@ -95,6 +106,11 @@ export class PhysicsEngine {
     if (penetration >= 0) {
       // Reposition above ground
       capy.y = groundY - capy.radius;
+
+      // Pack parachute upon touchdown
+      if (capy.isParachuting) {
+        capy.isParachuting = false;
+      }
 
       // Ground normal & tangent from slope
       const slope = this.world.getGroundSlope(capy.x);
@@ -144,40 +160,38 @@ export class PhysicsEngine {
       if (capy.isGrounded || capy.isSliding || Math.abs(capy.vy) < 50) {
         capy.isGrounded = true;
 
-        // Coulomb rolling deceleration (px/s^2)
-        const rollFrictionDecel = (capy.glideBoostTimer > 0 ? 120 : 420) * dt;
-        if (Math.abs(capy.vx) <= rollFrictionDecel) {
-          capy.vx = 0;
-        } else {
-          capy.vx -= Math.sign(capy.vx) * rollFrictionDecel;
-        }
-
-        // Slope effect with static friction threshold
-        const slopeGravity = Math.sin(slope) * this.gravity;
-        const staticFriction = 240; // slope gravity must exceed this to cause rolling from rest
-        if (Math.abs(slopeGravity) > staticFriction) {
-          capy.vx += (slopeGravity - Math.sign(slopeGravity) * staticFriction) * 0.4 * dt;
-        }
-
-        // Angular velocity rolls with linear velocity
-        capy.angularVelocity = (capy.vx / capy.radius) * 1.2;
-
-        // Track prolonged low-speed roll
-        if (Math.abs(capy.vx) < 55) {
-          capy.crawlTimer = (capy.crawlTimer || 0) + dt;
-        } else {
-          capy.crawlTimer = 0;
-        }
-
-        // Definitive STOP threshold or crawl timer expiry
-        if ((Math.abs(capy.vx) < 22 && Math.abs(capy.vy) < 35) || (capy.crawlTimer > 0.5)) {
+        if (capy.isLethallyHit) {
+          // Only stopped by lethal hazards (e.g. fatal cactus or mud sink)
           capy.vx = 0;
           capy.vy = 0;
           capy.angularVelocity = 0;
           capy.inFlight = false;
           capy.isSliding = false;
-          capy.isGrounded = true;
           capy.setExpression('dizzy', 999);
+        } else {
+          // HYBRID GAMEPLAY: Hitting the ground alone NEVER ends the run!
+          // Transitions smoothly into Ground Running mode.
+          capy.inFlight = true;
+          capy.isRunning = true;
+          capy.crawlTimer = 0;
+
+          // Align angle with terrain slope
+          capy.angle = slope;
+          capy.angularVelocity = 0;
+
+          // Maintain base ground running cruise speed
+          const minRunSpeed = 340;
+          if (capy.vx < minRunSpeed) {
+            capy.vx = Math.min(minRunSpeed, capy.vx + 600 * dt);
+          } else {
+            // Natural ground roll deceleration down toward running cruise speed
+            const rollFrictionDecel = (capy.glideBoostTimer > 0 ? 80 : 240) * dt;
+            capy.vx = Math.max(minRunSpeed, capy.vx - rollFrictionDecel);
+          }
+
+          // Gentle slope speed influence
+          const slopeGravity = Math.sin(slope) * 180 * dt;
+          capy.vx = Math.max(minRunSpeed, capy.vx + slopeGravity);
         }
       }
     } else {

@@ -37,7 +37,7 @@ class Game {
     this.world = new World();
     this.physics = new PhysicsEngine(this.world);
 
-    // States: 'TITLE', 'CANNON_LOADING', 'AIMING', 'CHARGING', 'FLIGHT', 'JETPACK_FLIGHT', 'STOPPED', 'GAMEOVER'
+    // States: 'TITLE', 'CANNON_LOADING', 'AIMING', 'CHARGING', 'FLIGHT', 'JETPACK_FLIGHT', 'PARACHUTE_GLIDE', 'RUNNER', 'STOPPED', 'GAMEOVER'
     this.state = 'TITLE';
 
     // Cannon loading intro animation state
@@ -58,6 +58,10 @@ class Game {
     this.minLaunchSpeed = 480; // low power plop speed
     this.maxLaunchSpeed = 3100; // massive high-velocity cannon blast!
     this.zenBoosts = 1;
+
+    // Jetpack & Fuel System (~5.5s continuous thrust capacity)
+    this.jetpackMaxFuel = 5.5;
+    this.jetpackFuel = 5.5;
 
     // Run statistics
     this.stats = {
@@ -157,10 +161,16 @@ class Game {
     this.ui.updateHUD(0, 0, 0);
     this.ui.hideResults();
 
-    // Reset Jetpack flight state
+    // Reset Jetpack & Runner state
+    this.jetpackFuel = this.jetpackMaxFuel;
     this.capybara.hasJetpack = false;
     this.capybara.isThrusting = false;
+    this.capybara.isParachuting = false;
+    this.capybara.isRunning = false;
+    this.capybara.hasDoubleJumped = false;
+    this.capybara.isLethallyHit = false;
     this.ui.setJetpackActive(false);
+    this.ui.updateJetpackFuel(1.0);
 
     // Development / Test mode check: auto-equip jetpack or show dev button if requested via URL
     try {
@@ -174,7 +184,7 @@ class Game {
         }
       }
       if (urlParams.get('jetpack') === '1' || urlParams.get('testJetpack') === '1') {
-        this.capybara.hasJetpack = true;
+        this.equipJetpack(true);
       }
     } catch (e) {}
   }
@@ -378,7 +388,7 @@ class Game {
         }
       }
       if (e.code === 'KeyJ' || e.key === 'j' || e.key === 'J') {
-        this.enterJetpackFlight();
+        this.toggleJetpack();
       }
     });
 
@@ -423,7 +433,7 @@ class Game {
     if (this.ui.jetpackDevBtn) {
       this.ui.jetpackDevBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.enterJetpackFlight();
+        this.toggleJetpack();
       });
     }
 
@@ -435,17 +445,17 @@ class Game {
         this.aimWithScreenCoords(e.clientX, e.clientY);
       } else if (this.state === 'CANNON_LOADING') {
         this.finishCannonLoading();
-      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
+      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
         this.onActionDown();
       }
     });
 
-    // Canvas Touch in Flight / Jetpack
+    // Canvas Touch in Flight / Jetpack / Runner
     this.canvas.addEventListener('touchstart', (e) => {
       if (this.state === 'CANNON_LOADING') {
         e.preventDefault();
         this.finishCannonLoading();
-      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
+      } else if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
         e.preventDefault();
         this.onActionDown();
       }
@@ -589,7 +599,33 @@ class Game {
     } else if (this.state === 'FLIGHT') {
       this.triggerZenBoost();
     } else if (this.state === 'JETPACK_FLIGHT') {
-      this.capybara.isThrusting = true;
+      if (this.jetpackFuel > 0) {
+        this.capybara.isThrusting = true;
+      }
+    } else if (this.state === 'RUNNER') {
+      if (this.capybara.hasJetpack && this.jetpackFuel > 0) {
+        this.state = 'JETPACK_FLIGHT';
+        this.capybara.isThrusting = true;
+      } else if (this.capybara.isGrounded) {
+        // Ground Jump
+        this.capybara.vy = -540;
+        this.capybara.isGrounded = false;
+        this.capybara.hasDoubleJumped = false;
+        if (this.capybara.anim) {
+          this.capybara.anim.play('jump');
+        }
+        this.audio.playBounce(0.3);
+      } else if (!this.capybara.hasDoubleJumped) {
+        // Mid-air Double Jump
+        this.capybara.vy = -480;
+        this.capybara.hasDoubleJumped = true;
+        if (this.capybara.anim) {
+          this.capybara.anim.play('double_jump');
+        }
+        this.audio.playBounce(0.5);
+      }
+    } else if (this.state === 'PARACHUTE_GLIDE') {
+      // Gliding down with parachute
     }
   }
 
@@ -601,15 +637,64 @@ class Game {
     }
   }
 
-  enterJetpackFlight() {
+  equipJetpack(refillFuel = true) {
     this.capybara.hasJetpack = true;
-    if (this.state === 'FLIGHT') {
+    this.capybara.isParachuting = false;
+    if (refillFuel) {
+      this.jetpackFuel = this.jetpackMaxFuel;
+    }
+    this.ui.setJetpackActive(true);
+    this.ui.updateJetpackFuel(this.jetpackFuel / this.jetpackMaxFuel);
+
+    if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
       this.state = 'JETPACK_FLIGHT';
-      this.ui.setJetpackActive(true);
-      this.ui.showToast("🎒 JETPACK FLIGHT ENGAGED!", "boost");
+      this.ui.showToast("🎒 JETPACK ENGAGED!", "boost");
     } else if (this.state === 'AIMING' || this.state === 'CHARGING') {
       this.ui.showToast("🎒 JETPACK EQUIPPED FOR LAUNCH", "boost");
     }
+  }
+
+  removeJetpack(deployChute = true) {
+    if (!this.capybara.hasJetpack) return;
+    this.capybara.hasJetpack = false;
+    this.capybara.isThrusting = false;
+    this.ui.setJetpackActive(false);
+
+    if (this.capybara.anim) {
+      this.capybara.anim.play('jetpack_eject');
+    }
+
+    if (deployChute && !this.capybara.isGrounded) {
+      this.deployParachute();
+    } else if (this.capybara.isGrounded) {
+      this.state = 'RUNNER';
+      this.capybara.isRunning = true;
+      if (this.capybara.anim) this.capybara.anim.play('run');
+    } else {
+      this.state = 'FLIGHT';
+    }
+  }
+
+  deployParachute() {
+    this.state = 'PARACHUTE_GLIDE';
+    this.capybara.isParachuting = true;
+    this.capybara.isThrusting = false;
+    if (this.capybara.anim) {
+      this.capybara.anim.play('parachute_deploy');
+    }
+    this.ui.showToast("🪂 PARACHUTE DEPLOYED!", "yuzu");
+  }
+
+  toggleJetpack() {
+    if (this.capybara.hasJetpack) {
+      this.removeJetpack(true);
+    } else {
+      this.equipJetpack(true);
+    }
+  }
+
+  enterJetpackFlight() {
+    this.toggleJetpack();
   }
 
   // Backwards-compatibility aliases
@@ -747,7 +832,7 @@ class Game {
     }
 
     // 3. Physics & Capybara update
-    if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT') {
+    if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER') {
       this.physics.update(this.capybara, dt, (x, y, intensity) => {
         this.audio.playBounce(intensity);
         this.particles.emitBounce(x, y, intensity);
@@ -756,11 +841,35 @@ class Game {
 
       this.capybara.update(dt);
 
-      // Jetpack thrust particle emission
-      if (this.state === 'JETPACK_FLIGHT' && this.capybara.isThrusting) {
-        const exhaustX = this.capybara.x - 12;
-        const exhaustY = this.capybara.y + 6;
-        this.particles.emitJetpackThrust(exhaustX, exhaustY, this.capybara.angle);
+      // Jetpack fuel drain & thrust particle emission
+      if (this.state === 'JETPACK_FLIGHT') {
+        if (this.capybara.isThrusting) {
+          this.jetpackFuel -= dt;
+          const exhaustX = this.capybara.x - 12;
+          const exhaustY = this.capybara.y + 6;
+          this.particles.emitJetpackThrust(exhaustX, exhaustY, this.capybara.angle);
+
+          if (this.jetpackFuel <= 0) {
+            this.jetpackFuel = 0;
+            this.capybara.isThrusting = false;
+            this.ui.showToast("⚠️ JETPACK FUEL DEPLETED!", "hazard");
+            this.removeJetpack(true); // Auto-eject jetpack and deploy parachute!
+          }
+        }
+        this.ui.updateJetpackFuel(this.jetpackFuel / this.jetpackMaxFuel);
+      }
+
+      // Check ground touchdown transitions
+      if (this.capybara.isGrounded) {
+        if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE') {
+          this.state = 'RUNNER';
+          this.capybara.isRunning = true;
+          this.capybara.isParachuting = false;
+          this.capybara.hasDoubleJumped = false;
+          if (this.capybara.anim) this.capybara.anim.play('run');
+        } else if (this.state === 'RUNNER') {
+          this.capybara.hasDoubleJumped = false;
+        }
       }
 
       // Check obstacle collisions
@@ -770,10 +879,11 @@ class Game {
         }
       }
 
-      // Check flight stop
+      // Check flight stop (only triggered if lethally stopped)
       if (!this.capybara.inFlight) {
         this.state = 'STOPPED';
         this.capybara.isThrusting = false;
+        this.capybara.isRunning = false;
         this.capybara.setExpression('dizzy', 999);
         if (this.capybara.anim) {
           this.capybara.anim.play('dizzy_stars');
@@ -819,7 +929,7 @@ class Game {
     let targetX = this.world.cannonX + 150;
     let targetY = this.world.getGroundY(this.world.cannonX) - 100;
 
-    if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'STOPPED' || this.state === 'GAMEOVER') {
+    if (this.state === 'FLIGHT' || this.state === 'JETPACK_FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'RUNNER' || this.state === 'STOPPED' || this.state === 'GAMEOVER') {
       targetX = this.capybara.x + this.capybara.vx * 0.25 + 140;
       targetY = this.capybara.y + this.capybara.vy * 0.15;
 

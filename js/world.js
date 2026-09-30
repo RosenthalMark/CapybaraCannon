@@ -2,7 +2,7 @@
  * World, Terrain Generation, Parallax Backgrounds, and Cannon
  */
 
-import { TNT, Trampoline, Yuzu, HotSpring, Pelican, Cactus, MudPit } from './obstacles.js?v=5';
+import { TNT, Trampoline, Yuzu, HotSpring, Pelican, Cactus, MudPit, JetpackPickup } from './obstacles.js?v=5';
 import { GlobalSprites, AnimationPlayer } from './sprites.js';
 
 export class World {
@@ -114,17 +114,21 @@ export class World {
       const groundY = this.getGroundY(x);
       const rand = Math.random();
 
-      if (rand < 0.20) {
+      if (rand < 0.16) {
         // Trampoline on ground
         this.obstacles.push(new Trampoline(x, groundY));
-      } else if (rand < 0.38) {
+      } else if (rand < 0.32) {
         // Yuzu: floating citrus
         const airY = Math.random() < 0.45 ? groundY - 35 : groundY - (Math.random() * 220 + 80);
         this.obstacles.push(new Yuzu(x, airY));
-      } else if (rand < 0.52) {
+      } else if (rand < 0.42) {
+        // Jetpack pickup (floating in air or resting on ground)
+        const airY = Math.random() < 0.5 ? groundY - 30 : groundY - (Math.random() * 180 + 70);
+        this.obstacles.push(new JetpackPickup(x, airY));
+      } else if (rand < 0.54) {
         // TNT barrel on ground
         this.obstacles.push(new TNT(x, groundY));
-      } else if (rand < 0.66) {
+      } else if (rand < 0.67) {
         // Pelican flying in air
         const airY = groundY - (Math.random() * 240 + 100);
         this.obstacles.push(new Pelican(x, airY));
@@ -147,7 +151,8 @@ export class World {
     const startItems = [
       { x: 500, type: 'trampoline' },
       { x: 920, type: 'yuzu' },
-      { x: 1350, type: 'cactus' }
+      { x: 1350, type: 'cactus' },
+      { x: 1800, type: 'jetpack' }
     ];
 
     for (const item of startItems) {
@@ -155,6 +160,7 @@ export class World {
       if (item.type === 'trampoline') this.obstacles.push(new Trampoline(item.x, groundY));
       else if (item.type === 'yuzu') this.obstacles.push(new Yuzu(item.x, groundY - 50));
       else if (item.type === 'cactus') this.obstacles.push(new Cactus(item.x, groundY));
+      else if (item.type === 'jetpack') this.obstacles.push(new JetpackPickup(item.x, groundY - 45));
     }
 
     this.spawnedDistance = 1600;

@@ -1082,3 +1082,20 @@ body.debug-hitboxes .title-hitbox {
 .sub-btn:hover {
   filter: brightness(1.15);
 }
+
+.jetpack-fuel-container {
+  width: 86px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.jetpack-fuel-bar {
+  width: 100%;
+  height: 100%;
+  background: #10b981;
+  transition: width 0.05s linear, background-color 0.2s ease;
+}

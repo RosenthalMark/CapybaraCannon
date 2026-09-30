@@ -212,6 +212,8 @@ export class UIManager {
   }
 
   setJetpackActive(active) {
+    this.isJetpackActive = active;
+    let fuelContainer = document.getElementById('jetpackFuelContainer');
     if (active) {
       if (this.boostsCard) {
         const label = this.boostsCard.querySelector('.hud-label');
@@ -221,6 +223,16 @@ export class UIManager {
         }
         const hint = this.boostsCard.querySelector('.boost-hint');
         if (hint) hint.textContent = '[HOLD SPACE / TOUCH]';
+      }
+      if (!fuelContainer && this.boostsCard) {
+        fuelContainer = document.createElement('div');
+        fuelContainer.id = 'jetpackFuelContainer';
+        fuelContainer.className = 'jetpack-fuel-container';
+        fuelContainer.innerHTML = '<div id="jetpackFuelBar" class="jetpack-fuel-bar"></div>';
+        this.boostsCard.appendChild(fuelContainer);
+      }
+      if (fuelContainer) {
+        fuelContainer.style.display = 'block';
       }
       if (this.jetpackDevBtn) {
         this.jetpackDevBtn.classList.add('active');
@@ -232,10 +244,40 @@ export class UIManager {
         const hint = this.boostsCard.querySelector('.boost-hint');
         if (hint) hint.textContent = '[SPACE / TAP]';
       }
+      if (fuelContainer) {
+        fuelContainer.style.display = 'none';
+      }
       this.updateBoosts(this.currentBoosts ?? 1);
       if (this.jetpackDevBtn) {
         this.jetpackDevBtn.classList.remove('active');
       }
+    }
+  }
+
+  updateJetpackFuel(fuel01) {
+    const pct = Math.max(0, Math.min(100, Math.round(fuel01 * 100)));
+    let fuelBar = document.getElementById('jetpackFuelBar');
+    let fuelContainer = document.getElementById('jetpackFuelContainer');
+    if (!fuelBar && this.boostsCard) {
+      fuelContainer = document.createElement('div');
+      fuelContainer.id = 'jetpackFuelContainer';
+      fuelContainer.className = 'jetpack-fuel-container';
+      fuelContainer.innerHTML = '<div id="jetpackFuelBar" class="jetpack-fuel-bar"></div>';
+      this.boostsCard.appendChild(fuelContainer);
+      fuelBar = document.getElementById('jetpackFuelBar');
+    }
+    if (fuelBar) {
+      fuelBar.style.width = `${pct}%`;
+      if (pct < 25) {
+        fuelBar.style.backgroundColor = '#ef4444';
+      } else if (pct < 55) {
+        fuelBar.style.backgroundColor = '#f59e0b';
+      } else {
+        fuelBar.style.backgroundColor = '#10b981';
+      }
+    }
+    if (fuelContainer) {
+      fuelContainer.style.display = this.isJetpackActive ? 'block' : 'none';
     }
   }
 

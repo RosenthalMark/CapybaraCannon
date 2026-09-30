@@ -34,6 +34,9 @@ export class Capybara {
     this.hasJetpack = false;
     this.isThrusting = false;
     this.isParachuting = false;
+    this.isRunning = false;
+    this.isLethallyHit = false;
+    this.hasDoubleJumped = false;
 
     // Sprite Animation Player
     this.anim = new AnimationPlayer(GlobalSprites);
@@ -59,6 +62,10 @@ export class Capybara {
     this.walkCycle = 0;
     this.hasJetpack = false;
     this.isThrusting = false;
+    this.isParachuting = false;
+    this.isRunning = false;
+    this.isLethallyHit = false;
+    this.hasDoubleJumped = false;
   }
 
   setExpression(expr, duration = 1.0) {
@@ -106,12 +113,22 @@ export class Capybara {
     if (this.anim) {
       this.anim.update(dt);
 
-      if (this.isParachuting) {
-        this.anim.play('parachute_glide');
+      if (this.anim.currentAnim === 'jetpack_eject' && !this.anim.isFinished) {
+        // Finish eject animation
+      } else if (this.isParachuting) {
+        if (this.anim.currentAnim !== 'parachute_deploy' && this.anim.currentAnim !== 'parachute_glide') {
+          this.anim.play('parachute_deploy');
+        } else if (this.anim.currentAnim === 'parachute_deploy' && this.anim.isFinished) {
+          this.anim.play('parachute_glide');
+        }
       } else if (this.expression === 'dizzy' && this.isGrounded && Math.abs(this.vx) < 20) {
         this.anim.play('dizzy_stars');
+      } else if (this.anim.currentAnim === 'jump' || this.anim.currentAnim === 'double_jump') {
+        if (this.isGrounded) {
+          this.anim.play('run');
+        }
       } else if (this.isGrounded) {
-        if (Math.abs(this.vx) > 5 || this.walkCycle > 0) {
+        if (Math.abs(this.vx) > 5 || this.walkCycle > 0 || this.isRunning) {
           this.anim.play('run');
         }
       }
@@ -137,7 +154,7 @@ export class Capybara {
         this.anim.draw(ctx, 68, 48, 0, 0);
       }
 
-      if (this.hasJetpack && (this.inFlight || this.isThrusting)) {
+      if (this.hasJetpack && !this.isParachuting && (this.inFlight || this.isRunning || this.isThrusting)) {
         this.drawJetpack(ctx);
       }
     } else {
