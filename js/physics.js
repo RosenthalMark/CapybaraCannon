@@ -46,59 +46,56 @@ export class PhysicsEngine {
 
     // 2. Gravity and Jetpack Thrust
     if (capy.isThrusting) {
-      // Calculate ground-relative altitude
-      const groundY = this.world.getGroundY(capy.x);
-      const altitude = groundY - capy.y;
-      const softAlt = this.jetpackMaxAltitude - this.jetpackSoftBuffer;
-
-      let effectiveThrust = this.jetpackThrust;
-      if (altitude > softAlt) {
-        // Attenuate thrust progressively in the buffer zone [softAlt, jetpackMaxAltitude]
-        const t = Math.max(0, Math.min(1.0, (altitude - softAlt) / this.jetpackSoftBuffer));
-        // Scale thrust from full jetpackThrust (1600) down to 400 px/s^2 at the top
-        // (below gravity so upward acceleration naturally softens and reverses)
-        const minThrustAtTop = 400;
-        effectiveThrust = this.jetpackThrust - t * (this.jetpackThrust - minThrustAtTop);
-
-        // Additional gentle atmospheric resistance on upward velocity
-        if (capy.vy < 0) {
-          capy.vy += t * 300 * dt;
-        }
+      // Strong upward climb acceleration
+      capy.vy += (this.gravity - this.jetpackThrust) * dt;
+      if (capy.vy < -520) {
+        capy.vy = -520; // vertical climb terminal speed
       }
 
-      // Upward thrust opposes downward gravity
-      capy.vy += (this.gravity - effectiveThrust) * dt;
-    } else if (capy.isParachuting) {
-      // Gentle parachute descent: reduced gravity, terminal fall capped at 130 px/s
-      const chuteGravity = 220;
-      capy.vy += chuteGravity * dt;
-      if (capy.vy > 130) {
-        capy.vy = 130;
-      }
-      // Maintain base forward gliding momentum if slow
-      if (capy.vx < 120) {
-        capy.vx += 160 * dt;
-      }
-    } else if (capy.isRunning && !capy.isGrounded) {
-      // Snappy platformer gravity for split-second responsive runner jumps!
-      const runnerGravity = 1150;
-      capy.vy += runnerGravity * dt;
+      // POWERFUL FORWARD BOOST SURGE (Jetpack Joyride style)
+      const forwardBoost = 520; // px/sec^2
+      capy.vx = Math.min(680, capy.vx + forwardBoost * dt);
     } else {
-      capy.vy += this.gravity * dt;
+      // When not thrusting, smoothly relax forward speed back to cruising run speed
+      if (capy.vx > 360) {
+        capy.vx += (360 - capy.vx) * 0.9 * dt;
+      }
+
+      if (capy.isParachuting) {
+        // Gentle parachute descent: reduced gravity, terminal fall capped at 130 px/s
+        const chuteGravity = 220;
+        capy.vy += chuteGravity * dt;
+        if (capy.vy > 130) {
+          capy.vy = 130;
+        }
+        // Maintain base forward gliding momentum if slow
+        if (capy.vx < 120) {
+          capy.vx += 160 * dt;
+        }
+      } else if (capy.isRunning && !capy.isGrounded) {
+        // Snappy platformer gravity for split-second responsive runner jumps!
+        const runnerGravity = 1150;
+        capy.vy += runnerGravity * dt;
+      } else {
+        capy.vy += this.gravity * dt;
+      }
     }
 
     // 3. Integrate position
     capy.x += capy.vx * dt;
     capy.y += capy.vy * dt;
 
-    // Upper flight envelope absolute safety clamp (when equipped with jetpack)
-    if (capy.hasJetpack) {
-      const currentGroundY = this.world.getGroundY(capy.x);
-      const currentAlt = currentGroundY - capy.y;
-      if (currentAlt > this.jetpackMaxAltitude) {
-        capy.y = currentGroundY - this.jetpackMaxAltitude;
+    // 3.5 Physical Warehouse Ceiling Collision (Jetpack Joyride style roof sliding)
+    if (this.world.getCeilingY) {
+      const ceilingY = this.world.getCeilingY(capy.x);
+      const ceilingPenetration = (ceilingY + capy.radius) - capy.y;
+      if (ceilingPenetration >= 0) {
+        capy.y = ceilingY + capy.radius;
         if (capy.vy < 0) {
           capy.vy = 0;
+        }
+        if (onBounce && Math.abs(capy.vx) > 180) {
+          onBounce(capy.x, ceilingY, 0.22);
         }
       }
     }

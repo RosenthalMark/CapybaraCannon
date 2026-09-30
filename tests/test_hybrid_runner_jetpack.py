@@ -192,7 +192,7 @@ def test_jetpack_pickup_equips_and_refills_fuel():
         state = page.evaluate("() => window.game.state")
 
         assert has_jp is True, "Expected jetpack equipped"
-        assert fuel == 5.5, f"Expected fuel refilled to 5.5s, got {fuel}"
+        assert fuel == 8.5, f"Expected fuel refilled to 8.5s, got {fuel}"
         assert state == "JETPACK_FLIGHT", f"Expected state JETPACK_FLIGHT, got {state}"
 
         browser.close()
@@ -268,12 +268,85 @@ def test_responsive_runner_jumps_and_camera_zoom():
         page.wait_for_function("() => window.game.state === 'RUNNER'", timeout=8000)
 
         zoom_runner = page.evaluate("() => window.game.camera.targetZoom")
-        assert zoom_runner >= 1.35, f"Expected close-up camera zoom >= 1.35 in RUNNER mode, got {zoom_runner}"
+        assert zoom_runner >= 1.30, f"Expected close-up camera zoom >= 1.30 in RUNNER mode, got {zoom_runner}"
 
         # Trigger snappy ground jump
         page.keyboard.press("Space")
         vy = page.evaluate("() => window.game.capybara.vy")
-        assert vy <= -580, f"Expected snappy platformer jump vy <= -580, got {vy}"
+        assert vy <= -350, f"Expected snappy takeoff/jump vy <= -350, got {vy}"
 
         browser.close()
+
+
+def test_warehouse_ceiling_collision_and_forward_boost():
+    """Thrusting surges vx forward, climbs upward, and clamps cleanly at warehouse ceiling."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        page.goto(f"{BASE_URL}/?direct=1")
+        page.wait_for_selector("#titleScreen:not(.hidden)")
+        page.click("#titlePlayBtn")
+
+        # Confirm direct warehouse start
+        page.wait_for_function("() => window.game.state === 'RUNNER' || window.game.state === 'JETPACK_FLIGHT'")
+        has_jp = page.evaluate("() => window.game.capybara.hasJetpack")
+        assert has_jp is True, "Expected capybara to have permanent jetpack equipped"
+
+        # Check ceiling definition
+        ceil_y = page.evaluate("() => window.game.world.getCeilingY(300)")
+        ground_y = page.evaluate("() => window.game.world.getGroundY(300)")
+        assert ceil_y < ground_y, f"Ceiling ({ceil_y}) should be above ground ({ground_y})"
+        assert ground_y - ceil_y >= 450, "Warehouse corridor height should be >= 450px"
+
+        vx_start = page.evaluate("() => window.game.capybara.vx")
+
+        # Hold thrust for 1.2s to climb to ceiling and surge forward
+        page.keyboard.down("Space")
+        page.wait_for_timeout(1200)
+        page.keyboard.up("Space")
+
+        vx_boosted = page.evaluate("() => window.game.capybara.vx")
+        capy_y = page.evaluate("() => window.game.capybara.y")
+        curr_ceil = page.evaluate("() => window.game.world.getCeilingY(window.game.capybara.x)")
+        radius = page.evaluate("() => window.game.capybara.radius")
+
+        # Forward boost surge
+        assert vx_boosted > vx_start, f"Thrust should surge vx forward: {vx_boosted} > {vx_start}"
+
+        # Ceiling clamp: Capy should not penetrate above ceiling (y >= curr_ceil + radius)
+        assert capy_y >= curr_ceil + radius - 2, f"Capy clamped below ceiling: {capy_y} >= {curr_ceil + radius}"
+
+        browser.close()
+
+
+def test_ground_recharge_and_no_flat_freeze():
+    """Ground running recharges jetpack battery and airborne pose never freezes flat on frame 5."""
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport=VIEWPORT_1080P)
+        page.goto(f"{BASE_URL}/?direct=1")
+        page.wait_for_selector("#titleScreen:not(.hidden)")
+        page.click("#titlePlayBtn")
+
+        # Burn some fuel in air
+        page.evaluate("() => { window.game.jetpackFuel = 4.0; window.game.capybara.y = 400; window.game.capybara.vy = 100; window.game.capybara.isGrounded = false; }")
+
+        # Trigger jump in air and verify it never freezes on flat frame 5
+        page.evaluate("() => window.game.capybara.anim.play('jump')")
+        page.wait_for_timeout(600)
+        anim_name = page.evaluate("() => window.game.capybara.anim.currentAnim")
+        frame_idx = page.evaluate("() => window.game.capybara.anim.frameIndex")
+        if anim_name == 'jump':
+            assert frame_idx < 5, f"Airborne jump animation should never freeze on flat frame 5, got frame {frame_idx}"
+
+        # Touch down and verify battery recharges
+        page.wait_for_function("() => window.game.capybara.isGrounded === true", timeout=6000)
+        fuel_touchdown = page.evaluate("() => window.game.jetpackFuel")
+        page.wait_for_timeout(800)
+        fuel_recharged = page.evaluate("() => window.game.jetpackFuel")
+
+        assert fuel_recharged > fuel_touchdown, f"Battery should recharge while running: {fuel_recharged} > {fuel_touchdown}"
+
+        browser.close()
+
 

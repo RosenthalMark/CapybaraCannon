@@ -59,9 +59,9 @@ class Game {
     this.maxLaunchSpeed = 3100; // massive high-velocity cannon blast!
     this.zenBoosts = 1;
 
-    // Jetpack & Fuel System (~5.5s continuous thrust capacity)
-    this.jetpackMaxFuel = 5.5;
-    this.jetpackFuel = 5.5;
+    // Jetpack & Fuel System (~8.5s continuous thrust capacity, ground rechargeable)
+    this.jetpackMaxFuel = 8.5;
+    this.jetpackFuel = 8.5;
 
     // Run statistics
     this.stats = {
@@ -190,6 +190,27 @@ class Game {
         this.equipJetpack(true);
       }
     } catch (e) {}
+  }
+
+  startWarehouseRun() {
+    this.resetRun();
+    this.ui.showLaunchControls(false);
+    this.ui.setJetpackActive(true);
+    this.state = 'RUNNER';
+    this.capybara.hasJetpack = true;
+    this.capybara.isRunning = true;
+    this.capybara.isGrounded = true;
+    this.capybara.inFlight = true;
+    this.capybara.isThrusting = false;
+    this.capybara.x = 220;
+    this.capybara.y = this.world.getGroundY(220) - this.capybara.radius;
+    this.capybara.vx = 360; // start immediately at forward cruising speed!
+    this.capybara.vy = 0;
+    this.capybara.angle = 0;
+    this.jetpackFuel = this.jetpackMaxFuel;
+    if (this.capybara.anim) {
+      this.capybara.anim.play('run', true);
+    }
   }
 
   startCannonLoading() {
@@ -548,6 +569,13 @@ class Game {
       e.stopPropagation();
       this.audio.stopTitleMusic();
       this.ui.showTitleScreen(false);
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('warehouse') === '1' || params.get('direct') === '1') {
+          this.startWarehouseRun();
+          return;
+        }
+      } catch (e) {}
       this.resetRun();
       this.startCannonLoading();
     });
@@ -644,16 +672,9 @@ class Game {
       if (this.world) this.world.cannonLCDState = 3;
     } else if (this.state === 'FLIGHT') {
       this.triggerZenBoost();
-    } else if (this.state === 'JETPACK_FLIGHT') {
-      if (this.jetpackFuel > 0) {
-        this.capybara.isThrusting = true;
-      }
-    } else if (this.state === 'RUNNER') {
-      if (this.capybara.hasJetpack && this.jetpackFuel > 0) {
-        this.state = 'JETPACK_FLIGHT';
-        this.capybara.isThrusting = true;
-      } else if (this.capybara.isGrounded) {
-        // Ground Jump - split-second snappy jump
+    } else if (this.state === 'RUNNER' || this.state === 'JETPACK_FLIGHT') {
+      if (this.capybara.isGrounded) {
+        // Ground Jump / Takeoff
         this.capybara.vy = -620;
         this.capybara.y -= 6;
         this.capybara.isGrounded = false;
@@ -663,13 +684,18 @@ class Game {
         }
         this.audio.playBounce(0.35);
       } else if (!this.capybara.hasDoubleJumped) {
-        // Mid-air Double Jump - split-second responsive
+        // Mid-air Double Jump
         this.capybara.vy = -560;
         this.capybara.hasDoubleJumped = true;
         if (this.capybara.anim) {
           this.capybara.anim.play('double_jump', true);
         }
         this.audio.playBounce(0.55);
+      }
+
+      if (this.capybara.hasJetpack && this.jetpackFuel > 0) {
+        this.state = 'JETPACK_FLIGHT';
+        this.capybara.isThrusting = true;
       }
     } else if (this.state === 'PARACHUTE_GLIDE') {
       // Gliding down with parachute
@@ -679,7 +705,7 @@ class Game {
   onActionUp() {
     if (this.state === 'CHARGING') {
       this.fireCannon();
-    } else if (this.state === 'JETPACK_FLIGHT') {
+    } else if (this.state === 'JETPACK_FLIGHT' || this.state === 'RUNNER') {
       this.capybara.isThrusting = false;
     }
   }
@@ -893,19 +919,28 @@ class Game {
 
       this.capybara.update(dt);
 
-      // Jetpack fuel drain & thrust particle emission
-      if (this.state === 'JETPACK_FLIGHT') {
+      // Jetpack fuel drain, thrust emission & floor recharging (Jetpack Joyride style)
+      if (this.state === 'JETPACK_FLIGHT' || this.state === 'RUNNER') {
         if (this.capybara.isThrusting) {
-          this.jetpackFuel -= dt;
-          const exhaustX = this.capybara.x - 12;
-          const exhaustY = this.capybara.y + 6;
-          this.particles.emitJetpackThrust(exhaustX, exhaustY, this.capybara.angle);
+          if (this.jetpackFuel > 0) {
+            this.jetpackFuel -= dt * 0.95; // ~9s continuous flight
+            const exhaustX = this.capybara.x - 12;
+            const exhaustY = this.capybara.y + 6;
+            this.particles.emitJetpackThrust(exhaustX, exhaustY, this.capybara.angle);
 
-          if (this.jetpackFuel <= 0) {
-            this.jetpackFuel = 0;
+            if (this.jetpackFuel <= 0) {
+              this.jetpackFuel = 0;
+              this.capybara.isThrusting = false;
+              this.ui.showToast("⚠️ JETPACK FUEL DEPLETED!", "hazard");
+              this.removeJetpack(true); // Auto-eject jetpack and deploy parachute!
+            }
+          } else {
             this.capybara.isThrusting = false;
-            this.ui.showToast("⚠️ JETPACK FUEL DEPLETED!", "hazard");
-            this.removeJetpack(true); // Auto-eject jetpack and deploy parachute!
+          }
+        } else if (this.capybara.isGrounded) {
+          // Rapid ground recharge when running on the warehouse floor!
+          if (this.jetpackFuel < this.jetpackMaxFuel) {
+            this.jetpackFuel = Math.min(this.jetpackMaxFuel, this.jetpackFuel + dt * 3.2);
           }
         }
         this.ui.updateJetpackFuel(this.jetpackFuel / this.jetpackMaxFuel);
@@ -932,7 +967,7 @@ class Game {
 
       // Check ground touchdown transitions
       if (this.capybara.isGrounded) {
-        if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE') {
+        if (this.state === 'FLIGHT' || this.state === 'PARACHUTE_GLIDE' || this.state === 'JETPACK_FLIGHT') {
           this.state = 'RUNNER';
           this.capybara.isRunning = true;
           this.capybara.isParachuting = false;
@@ -1004,26 +1039,22 @@ class Game {
       targetX = this.capybara.x + this.capybara.vx * 0.25 + 140;
       targetY = this.capybara.y + this.capybara.vy * 0.15;
 
-      // Keep camera from going too far underground
+      // Warehouse facility vertical corridor framing (between floor and physical ceiling)
       const groundY = this.world.getGroundY(this.capybara.x);
-      targetY = Math.min(targetY, groundY - 140);
+      const ceilingY = this.world.getCeilingY ? this.world.getCeilingY(this.capybara.x) : (groundY - 480);
+      const corridorMidY = (groundY + ceilingY) * 0.5;
 
-      // Dynamic Zoom based on mode, speed, and altitude (closer up for readability & cute capy)
-      const speed = Math.sqrt(this.capybara.vx ** 2 + this.capybara.vy ** 2);
-      const altitude = Math.max(0, groundY - this.capybara.y);
+      // Frame the warehouse corridor with smooth dynamic tracking on Cappy
+      targetY = corridorMidY + (this.capybara.y - corridorMidY) * 0.45;
 
-      if (this.state === 'RUNNER') {
-        this.camera.targetZoom = 1.38; // Close-up view for responsive platformer jumping & obstacles
+      if (this.state === 'RUNNER' || this.state === 'JETPACK_FLIGHT') {
+        this.camera.targetZoom = 1.34; // Close-up view for warehouse obstacle dodging & cute capy
       } else if (this.state === 'PARACHUTE_GLIDE') {
         this.camera.targetZoom = 1.22; // Comfortable zoom to see parachute canopy and landing
       } else if (this.state === 'STOPPED' || this.state === 'GAMEOVER') {
         this.camera.targetZoom = 1.45; // Close-up on cute chill/dizzy capybara!
-      } else if (speed > 850 || altitude > 700) {
-        this.camera.targetZoom = 0.68;
-      } else if (speed > 450 || altitude > 350) {
-        this.camera.targetZoom = 0.88;
       } else {
-        this.camera.targetZoom = 1.08;
+        this.camera.targetZoom = 1.20;
       }
     } else {
       this.camera.targetZoom = 1.0;

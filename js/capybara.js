@@ -31,10 +31,10 @@ export class Capybara {
     this.glideBoostTimer = 0; // for hot springs or citrus turbo
     this.crawlTimer = 0;
     this.walkCycle = 0;
-    this.hasJetpack = false;
+    this.hasJetpack = true; // Jetpack Joyride style: permanent core equipment
     this.isThrusting = false;
     this.isParachuting = false;
-    this.isRunning = false;
+    this.isRunning = true;
     this.isLethallyHit = false;
     this.hasDoubleJumped = false;
 
@@ -54,16 +54,16 @@ export class Capybara {
     this.scaleY = 1.0;
     this.expression = 'zen';
     this.expressionTimer = 0;
-    this.inFlight = false;
-    this.isGrounded = false;
+    this.inFlight = true;
+    this.isGrounded = true;
     this.isSliding = false;
     this.glideBoostTimer = 0;
     this.crawlTimer = 0;
     this.walkCycle = 0;
-    this.hasJetpack = false;
+    this.hasJetpack = true;
     this.isThrusting = false;
     this.isParachuting = false;
-    this.isRunning = false;
+    this.isRunning = true;
     this.isLethallyHit = false;
     this.hasDoubleJumped = false;
   }
@@ -96,24 +96,27 @@ export class Capybara {
     this.scaleX += (1.0 - this.scaleX) * 12 * dt;
     this.scaleY += (1.0 - this.scaleY) * 12 * dt;
 
-    // Smooth airborne / flight angle orientation
+    // Smooth airborne / flight angle orientation (Jetpack Joyride style)
     if (this.isParachuting) {
       // Parachute stays upright, banking softly to steer tilt
       this.angularVelocity = 0;
     } else if (this.isGrounded) {
-      // Grounded: conforms to slope, zero tumble
+      // Grounded: conforms smoothly to terrain slope, zero tumble
+      const targetAngle = this.world ? this.world.getGroundSlope(this.x) : 0;
+      this.angle += (targetAngle - this.angle) * 12 * dt;
       this.angularVelocity = 0;
-    } else if (this.hasJetpack && this.inFlight && this.isThrusting) {
-      const targetAngle = -0.15; // slight upward tilt during thrust
-      this.angle += (targetAngle - this.angle) * 8 * dt;
-      this.angularVelocity *= Math.pow(0.85, dt * 60);
-    } else if (!this.isGrounded && this.anim.currentAnim !== 'double_jump') {
-      // Free airborne flight: bank smoothly with velocity vector (prevents getting stuck flat!)
-      const targetAngle = Math.atan2(this.vy, Math.max(120, this.vx)) * 0.45;
-      this.angle += (targetAngle - this.angle) * 6 * dt;
-      this.angularVelocity *= Math.pow(0.88, dt * 60);
+    } else if (this.isThrusting) {
+      // Jetpack firing: energetic slight upward climb tilt (-0.12 rad / -7 deg)
+      const targetAngle = -0.12;
+      this.angle += (targetAngle - this.angle) * 10 * dt;
+      this.angularVelocity = 0;
+    } else if (!this.isGrounded) {
+      // Gliding/falling downward: gentle banking with velocity vector (clamped tightly between -0.15 and +0.12 rad)
+      const targetAngle = Math.atan2(this.vy, Math.max(160, this.vx)) * 0.28;
+      const clampedTarget = Math.max(-0.15, Math.min(0.12, targetAngle));
+      this.angle += (clampedTarget - this.angle) * 8 * dt;
+      this.angularVelocity = 0;
     } else {
-      // Jump flip rotation
       this.angle += this.angularVelocity * dt;
       this.angularVelocity *= Math.pow(0.96, dt * 60);
     }
@@ -138,18 +141,26 @@ export class Capybara {
         }
       } else if (this.expression === 'dizzy' && this.isGrounded && Math.abs(this.vx) < 20) {
         this.anim.play('dizzy_stars');
+      } else if (this.isThrusting) {
+        // While firing jetpack, keep energetic athletic running/flying legs active!
+        if (this.anim.currentAnim !== 'run') {
+          this.anim.play('run');
+        }
       } else if (this.anim.currentAnim === 'jump' || this.anim.currentAnim === 'double_jump') {
         if (this.isGrounded) {
           this.anim.play('run');
+        } else if (this.anim.frameIndex >= 4) {
+          // NEVER freeze on flat belly-flop frame 5 while airborne! Hold athletic tuck (frame 3)
+          this.anim.frameIndex = 3;
         }
       } else if (this.isGrounded) {
-        if (Math.abs(this.vx) > 5 || this.walkCycle > 0 || this.isRunning) {
+        if (this.anim.currentAnim !== 'run') {
           this.anim.play('run');
         }
-      } else if (this.inFlight && !this.isGrounded && !this.hasJetpack) {
-        // In free airborne flight (e.g. cannon launch), if not jumping, use dynamic airborne pose!
-        if (this.anim.currentAnim === 'run') {
-          this.anim.play('jump');
+      } else if (!this.isGrounded) {
+        // In air without thrust: hold athletic run/flight pose, never flat
+        if (this.anim.currentAnim !== 'jump' && this.anim.currentAnim !== 'double_jump') {
+          this.anim.play('run');
         }
       }
     }
