@@ -47,9 +47,17 @@ This roadmap documents the architectural milestones, core gameplay systems, and 
 ### Phase 2: Customization & Progression Systems
 
 - [ ] **Feature 2.1 — Wardrobe & Cosmetic Data Schema**  
-  Modular slot structure: Hats, Hair, Shirts, Pants, Skirts, Shoes, Jewelry, and Accessories.
-- [ ] **Feature 2.2 — Customize Screen Workbench**  
-  Side-view capybara mannequin with directional category arrows/callouts, secondary item preview popups, and equipment-specific areas (Capybara, Jetpack, mysterious Special Power progression slots).
+  Full 9-socket modular cosmetic schema with zero-stat cosmetic purity:
+  - **7 Character Slots:** Hats/Headwear, Hair/Wigs, Eyewear/Face, Tops/Shirts, Bottoms (Pants/Skirts/Shorts), Footwear/Shoes, Neck & Accessories.
+  - **2 Universal FX / Vehicle Slots:** Trails (dynamic emission ribbons scaling across cannon launch, flight, and runner), Parachutes (canopy skins deployed on descent).
+- [ ] **Feature 2.2 — Customize Screen Workbench & Jetpack Workshop**  
+  Interactive dual-context workbench with 2560×1080 ultrawide mobile canvas (1920×1080 central safe zone):
+  - **Capybara Mannequin Context:** Rotatable character preview with directional socket callouts, item preview popups, and real-time clothing layering.
+  - **Dedicated Jetpack Workshop Context:** 4-socket modular jetpack customization:
+    1. *Chassis / Body Skin:* Twin Chrome, Fizzy Pop Cans, Cyber Battery Pack, Hinoki Keg, Firework Bundle.
+    2. *Thruster Flame & Plume FX:* Classic Fire, Rainbow Neon Laser, Soda Bubble Spray, Hot Spring Steam, Party Confetti.
+    3. *Nozzle Hardware:* Dual Chrome Cones, Square Cyber Vents, Bamboo Shoots, Golden Dragon Mouths.
+    4. *Thruster Audio FX:* Deep Rocket Roar, 8-Bit Synth Buzz, Fizzy Soda Hiss, Steam Whistle.
 - [ ] **Feature 2.3 — Living Capybara Shop Location**  
   Illustrated store environment with modular animated shopkeeper behind the counter, interactive merchandise displays (racks/shelves) triggering purchase popups, counter bell call-backs, and persistent currency display.
 - [ ] **Feature 2.4 — Shopkeeper Challenges System**  

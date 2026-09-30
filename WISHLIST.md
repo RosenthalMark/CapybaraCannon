@@ -117,3 +117,28 @@ Seasonal rewards may include:
 * **Grand Final Reward:** An ultra-desirable, prestigious cosmetic (e.g. mythic outfit or legendary trail effect) capping off track completion. Non-P2W.
 
 ---
+
+### Item 002: Parachute Skins Customization System
+
+**Status:** `[ ] WISHLIST`  
+**Working Concept:** Equippable, cosmetic parachute canopies deployed during in-flight descent transitions.
+
+#### 1. Concept & Gameplay Role
+* Following Jetpack fuel exhaustion (or upon manual parachute activation), Cappy deploys an aerial canopy to float gently down to the runner terrace.
+* Parachute skins serve as a prominent visual customization item visible during the descent transition, perfectly bridging high-altitude flight and ground running.
+* **Strict Anti-Pay-to-Win Philosophy:** Parachute skins are 100% cosmetic with zero impact on glide speed, descent rate, or physics.
+
+#### 2. Visual Variants Pool
+* 🍊 **Sliced Yuzu:** Translucent yellow/orange canopy with citrus wheel spokes.
+* 🌈 **Rainbow Arcade:** Multi-colored radial stripes matching the title theme aesthetic.
+* 🍉 **Summer Watermelon:** Bright pink canopy with black seeds and a lime green outer rim.
+* ♨️ **Onsen Steam:** Traditional white cotton canopy stamped with a blue bathhouse crest and soft rising steam particles.
+* ⚡ **Cyber Neon Grid:** Matte black canopy with glowing synthwave magenta and cyan circuit traces.
+* 🌸 **Sakura Drift:** Pastel pink canopy shedding fluttering cherry blossom petals during descent.
+
+#### 3. System & UI Integration
+* **Customize Screen Integration:** Adds a dedicated "Parachute" equipment socket alongside Capybara Wardrobe, Jetpacks, and Trails.
+* **Distribution Channels:** Earnable via Cappy Bear Club seasonal progression tracks, Shopkeeper quest milestones, and in-game shop rotation.
+* **Asset Pipeline:** Powered by modular 5-stage animation templates ([`assets/art/capy/parachute/parachute_skin_template.png`](file:///Users/markrosenthal/Desktop/CapybaraCannon/assets/art/capy/parachute/parachute_skin_template.png)) allowing new skins to be authored without altering Cappy's base rigging.
+
+---

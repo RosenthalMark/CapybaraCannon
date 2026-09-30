@@ -208,4 +208,35 @@ The long-term vision of Capybara Cannon includes hybrid gameplay alternating bet
 - **Cons**:
   - Requires maintaining temporary developer trigger entry points until pickup items are placed in the world.
 
+---
+
+## ADR-006: Modular Customization Sockets (Wardrobe, Parachutes, and Jetpack Workbench)
+
+### Status: Accepted
+
+### Context
+Customization is a cornerstone of player expression, retention, and seasonal progression. To prevent ad-hoc asset creation that becomes difficult to rig and scale in code, we needed to formalize the exact cosmetic slot taxonomy for both the Capybara character and the Jetpack vehicle before UI implementation.
+
+### Decision
+1. **Zero-Stat Cosmetic Purity**:
+   - All customizable items across every socket are 100% cosmetic with zero impact on physics, launch speed, lift, drag, or fuel capacity.
+2. **Capybara Wardrobe & Universal Slots (9 Sockets)**:
+   - **7 Character Sockets:** `hat`, `hair`, `eyewear`, `top`, `bottom`, `shoes`, `accessory` (neck/jewelry).
+   - **2 Universal FX / Vehicle Sockets:** `trail` (emission particles active across cannon launch, flight, and runner), `parachute` (canopy skins deployed on descent).
+3. **Dedicated Jetpack Workshop (4 Modular Sockets)**:
+   - `chassis`: Visual backpack body model (Twin Chrome, Fizzy Pop Cans, Cyber Battery, Hinoki Keg, Firework Bundle).
+   - `flame_fx`: Thruster particle plume (Combustion Fire, Rainbow Neon Laser, Soda Foam, Hot Spring Steam, Confetti).
+   - `nozzle`: Hardware tips (Chrome Cones, Cyber Vents, Bamboo Shoots, Dragon Mouths).
+   - `audio_fx`: Synthesized/procedural thruster sound profile (Deep Roar, 8-bit Synth, Soda Hiss, Steam Whistle).
+4. **Resolution & Viewport Standard**:
+   - Full-screen interfaces (Shop, Customize Workbench, Wardrobe) authored at **`2560 × 1080 px`** ultrawide with critical UI elements, mannequins, and buttons strictly bounded within the central **`1920 × 1080 px`** safe zone.
+
+### Consequences
+- **Pros**:
+  - Clear contract between art creation in Canva and engine sprite rendering.
+  - Effortless cross-device responsive layout across modern iPhones (19.5:9), Androids (20:9), and standard 16:9 displays without letterboxing.
+  - Enables modular data-driven seasonal content packs without altering core physics loops.
+- **Cons**:
+  - Requires layering render passes to draw clothing and equipment in correct z-index order (e.g. hair over hat vs hat over hair).
+
 

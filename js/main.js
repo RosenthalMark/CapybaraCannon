@@ -185,6 +185,8 @@ class Game {
     this.loadingTimer = 0;
     this.loadingHeadPeek = 0;
     this.ui.showLaunchControls(true);
+    if (this.world) this.world.cannonLCDState = 1;
+    if (this.capybara.anim) this.capybara.anim.play('run');
 
     // Initial position on ground terrace entering from the left
     const startX = this.world.cannonX - 120;
@@ -204,6 +206,7 @@ class Game {
     this.loadingHeadPeek = 4;
     this.loadingTimer = 0;
     this.world.cannonRecoil = 0;
+    if (this.world) this.world.cannonLCDState = 0;
     this.capybara.scaleX = 1.0;
     this.capybara.scaleY = 1.0;
     this.capybara.walkCycle = 0;
@@ -573,6 +576,7 @@ class Game {
       this.powerDirection = 1;
       this.ui.setChargingState(true);
       this.audio.resume();
+      if (this.world) this.world.cannonLCDState = 3;
       return;
     }
     if (this.state === 'AIMING') {
@@ -581,6 +585,7 @@ class Game {
       this.powerDirection = 1;
       this.ui.setChargingState(true);
       this.audio.resume();
+      if (this.world) this.world.cannonLCDState = 3;
     } else if (this.state === 'FLIGHT') {
       this.triggerZenBoost();
     } else if (this.state === 'JETPACK_FLIGHT') {
@@ -685,6 +690,7 @@ class Game {
     this.particles.emitZenBoost(this.capybara.x, this.capybara.y);
     this.triggerScreenShake(8, 0.2);
     this.ui.showToast("🍊 ZEN BOOST!", "yuzu");
+    if (this.world) this.world.cannonLCDState = 5;
 
     this.capybara.setExpression('happy', 1.2);
     // Add forward & upward impulse
@@ -768,6 +774,10 @@ class Game {
       if (!this.capybara.inFlight) {
         this.state = 'STOPPED';
         this.capybara.isThrusting = false;
+        this.capybara.setExpression('dizzy', 999);
+        if (this.capybara.anim) {
+          this.capybara.anim.play('dizzy_stars');
+        }
         this.stopDelayTimer = 1.1;
       }
 

@@ -3,6 +3,7 @@
  */
 
 import { TNT, Trampoline, Yuzu, HotSpring, Pelican, Cactus, MudPit } from './obstacles.js?v=5';
+import { GlobalSprites, AnimationPlayer } from './sprites.js';
 
 export class World {
   constructor(baseGroundY = 550) {
@@ -20,6 +21,10 @@ export class World {
     this.cannonLength = 55;
     this.cannonWidth = 32;
     this.cannonRecoil = 0;
+
+    // Cannon Blast & LCD Animations
+    this.cannonBlastPlayer = new AnimationPlayer(GlobalSprites);
+    this.cannonLCDState = 0; // 0: AIMING, 1: LOADING, 2: CHAMBER, 3: CHARGING, 4: LAUNCH, 5: MAX
 
     // Procedural clouds
     this.clouds = [];
@@ -68,6 +73,11 @@ export class World {
   update(dt, cameraX) {
     // Recoil recovery
     this.cannonRecoil += (0 - this.cannonRecoil) * 8 * dt;
+
+    // Cannon blast animation update
+    if (this.cannonBlastPlayer) {
+      this.cannonBlastPlayer.update(dt);
+    }
 
     // Drifting clouds
     for (const cloud of this.clouds) {
@@ -152,6 +162,10 @@ export class World {
 
   triggerCannonFire(amount = 26) {
     this.cannonRecoil = amount; // kick back
+    if (this.cannonBlastPlayer) {
+      this.cannonBlastPlayer.play('cannon_blast', true);
+    }
+    this.cannonLCDState = 4;
   }
 
   drawBackground(ctx, camera, width, height) {
@@ -288,6 +302,18 @@ export class World {
     const x = this.cannonX;
     const y = this.getGroundY(x);
 
+    // 1. Explosive 12-Frame Detonation Sequence on Fire
+    if (this.cannonBlastPlayer && this.cannonBlastPlayer.currentAnim === 'cannon_blast' && !this.cannonBlastPlayer.isFinished) {
+      const rect = GlobalSprites.getFrameRect('cannon_blast', this.cannonBlastPlayer.frameIndex);
+      if (rect) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.drawImage(rect.img, rect.sx, rect.sy, rect.sw, rect.sh, -65, -100, 180, 135);
+        ctx.restore();
+        return;
+      }
+    }
+
     ctx.save();
     ctx.translate(x, y);
 
@@ -314,6 +340,20 @@ export class World {
     ctx.beginPath();
     ctx.arc(0, -18, 5, 0, Math.PI * 2);
     ctx.fill();
+
+    // Render Neon LCD Screen on Carriage
+    const lcd = GlobalSprites.getLCDFrame(this.cannonLCDState ?? 0);
+    if (lcd) {
+      ctx.save();
+      ctx.translate(-14, -6);
+      ctx.fillStyle = '#050510';
+      ctx.fillRect(-12, -8, 24, 16);
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-12, -8, 24, 16);
+      ctx.drawImage(lcd.img, lcd.sx, lcd.sy, lcd.sw, lcd.sh, -11, -7, 22, 14);
+      ctx.restore();
+    }
 
     // Cannon Barrel Pivot
     ctx.translate(0, -22);

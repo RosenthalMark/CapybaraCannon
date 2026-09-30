@@ -4,6 +4,8 @@
  * squash/stretch bounce physics, and rotation.
  */
 
+import { GlobalSprites, AnimationPlayer } from './sprites.js';
+
 export class Capybara {
   constructor(x = 0, y = 0) {
     this.x = x;
@@ -31,6 +33,11 @@ export class Capybara {
     this.walkCycle = 0;
     this.hasJetpack = false;
     this.isThrusting = false;
+    this.isParachuting = false;
+
+    // Sprite Animation Player
+    this.anim = new AnimationPlayer(GlobalSprites);
+    this.anim.play('run');
   }
 
   reset(x, y) {
@@ -94,6 +101,21 @@ export class Capybara {
 
     // Angular drag
     this.angularVelocity *= Math.pow(0.96, dt * 60);
+
+    // Sprite animation state selection & update
+    if (this.anim) {
+      this.anim.update(dt);
+
+      if (this.isParachuting) {
+        this.anim.play('parachute_glide');
+      } else if (this.expression === 'dizzy' && this.isGrounded && Math.abs(this.vx) < 20) {
+        this.anim.play('dizzy_stars');
+      } else if (this.isGrounded) {
+        if (Math.abs(this.vx) > 5 || this.walkCycle > 0) {
+          this.anim.play('run');
+        }
+      }
+    }
   }
 
   draw(ctx) {
@@ -104,8 +126,23 @@ export class Capybara {
     ctx.rotate(this.angle);
     ctx.scale(this.scaleX, this.scaleY);
 
-    // Shadow on ground when close (drawn by world, but let's render self)
-    this.drawCapybaraBody(ctx);
+    if (this.anim && this.anim.canDraw()) {
+      if (this.anim.currentAnim === 'dizzy_stars') {
+        this.anim.draw(ctx, 64, 48, 0, -4);
+      } else if (this.anim.currentAnim === 'parachute_glide' || this.anim.currentAnim === 'parachute_deploy') {
+        this.anim.draw(ctx, 60, 96, 0, -24);
+      } else if (this.anim.currentAnim === 'jump' || this.anim.currentAnim === 'double_jump') {
+        this.anim.draw(ctx, 68, 54, 0, -2);
+      } else {
+        this.anim.draw(ctx, 68, 48, 0, 0);
+      }
+
+      if (this.hasJetpack && (this.inFlight || this.isThrusting)) {
+        this.drawJetpack(ctx);
+      }
+    } else {
+      this.drawCapybaraBody(ctx);
+    }
 
     ctx.restore();
   }
